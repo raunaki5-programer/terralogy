@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAppStore } from '@/store'
 import type { Farm, Field } from '@/types'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API = 'https://terralogy-api-v2.onrender.com'
 
 export default function FarmDetail() {
   const { id } = useParams<{ id: string }>()

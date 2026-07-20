@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API = 'https://terralogy-api-v2.onrender.com'
 
 interface Props {
   lat: number

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { Farm, Field, FieldAnalysis, Alert } from '@/types'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API = 'https://terralogy-api-v2.onrender.com'
 
 interface AppState {
   farms: Farm[]

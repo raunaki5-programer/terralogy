@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API = 'https://terralogy-api-v2.onrender.com'
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false)
