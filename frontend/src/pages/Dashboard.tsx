@@ -41,7 +41,7 @@ export default function Dashboard() {
 
       <div className="card mb-3" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
         <div className="map-hint">Click anywhere on the map to add a farm</div>
-        <MapView farms={farms} onFarmClick={(f) => navigate(`/farms/${f.id}`)} onMapClick={handleMapClick} selectMode />
+        <MapView farms={farms} onFarmClick={(f) => navigate(`/farms/${f.id}`)} onMapClick={handleMapClick} />
         {newFarm && (
           <div className="map-popup">
             <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 15 }}>New Farm at {newFarm.lat}, {newFarm.lng}</div>

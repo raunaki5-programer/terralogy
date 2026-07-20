@@ -1,73 +1,54 @@
-import { useEffect, useRef, useState } from 'react'
-import type { Farm, Field } from '@/types'
+import { useEffect, useRef } from 'react'
+import type { Farm } from '@/types'
 
 interface Props {
   farms: Farm[]
-  fields?: Field[]
   onFarmClick?: (farm: Farm) => void
   onMapClick?: (lat: number, lng: number) => void
-  selectMode?: boolean
 }
 
-export default function MapView({ farms, fields, onFarmClick, onMapClick, selectMode }: Props) {
+export default function MapView({ farms, onFarmClick, onMapClick }: Props) {
   const container = useRef<HTMLDivElement>(null)
-  const [mapReady, setMapReady] = useState(false)
+  const mapRef = useRef<any>(null)
+  const markersRef = useRef<any[]>([])
 
   useEffect(() => {
     if (!container.current) return
+    let cancelled = false
     import('maplibre-gl').then(({ default: maplibregl }) => {
+      if (cancelled || !container.current) return
       const map = new maplibregl.Map({
-        container: container.current!,
+        container: container.current,
         style: {
           version: 8,
-          sources: {
-            'esri-satellite': {
-              type: 'raster',
-              tiles: ['https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-              tileSize: 256, attribution: '&copy; Esri', maxzoom: 19,
-            },
-          },
-          layers: [{ id: 'satellite', type: 'raster', source: 'esri-satellite' }],
+          sources: { 'esri': { type: 'raster', tiles: ['https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19 } },
+          layers: [{ id: 'satellite', type: 'raster', source: 'esri' }],
         },
         center: [78, 22], zoom: 4.5, maxZoom: 19,
       })
       map.addControl(new maplibregl.NavigationControl(), 'top-right')
-
-      map.on('click', (e) => {
-        if (onMapClick) onMapClick(e.lngLat.lat, e.lngLat.lng)
-      })
-
-      map.on('load', () => setMapReady(true))
-
-      if (selectMode) map.getCanvas().style.cursor = 'crosshair'
-
-      return () => map.remove()
+      map.on('click', (e: any) => onMapClick?.(e.lngLat.lat, e.lngLat.lng))
+      mapRef.current = map
     })
+    return () => { cancelled = true; mapRef.current?.remove() }
   }, [])
 
-  // Add farm markers
   useEffect(() => {
-    if (!mapReady || !container.current) return
-    // Need to re-import to get map instance
+    if (!mapRef.current) return
+    const map = mapRef.current
     import('maplibre-gl').then(({ default: maplibregl }) => {
-      const mapEl = container.current?.querySelector('.maplibregl-map') as any
-      if (!mapEl?._map) return
-      const map = mapEl._map
-
-      // Clear existing markers
-      document.querySelectorAll('.map-marker').forEach(el => el.remove())
-
+      markersRef.current.forEach(m => m.remove())
+      markersRef.current = []
       farms.forEach((farm) => {
         const el = document.createElement('div')
-        el.className = 'map-marker'
-        el.innerHTML = '📍'
+        el.innerHTML = '<div style="background:#00d4aa;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);cursor:pointer" />'
         el.title = farm.name
-        el.style.cssText = 'font-size:22px;cursor:pointer;'
         el.onclick = () => onFarmClick?.(farm)
-        new maplibregl.Marker({ element: el }).setLngLat([farm.location.lng, farm.location.lat]).addTo(map)
+        const marker = new maplibregl.Marker({ element: el }).setLngLat([farm.location.lng, farm.location.lat]).addTo(map)
+        markersRef.current.push(marker)
       })
     })
-  }, [farms, mapReady])
+  }, [farms, onFarmClick])
 
-  return <div ref={container} className="map-container" />
+  return <div ref={container} style={{ width: '100%', height: '500px' }} />
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAppStore } from '@/store'
+import SatelliteViewer from '@/components/SatelliteViewer'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -39,6 +40,9 @@ export default function FieldDetail() {
       <button className="btn btn-ghost btn-sm mb-3" onClick={() => navigate(-1)}>← Back</button>
       <h2 style={{ fontSize: 22, fontWeight: 600 }}>{field.name}</h2>
       <p className="text-muted mb-4">{field.area_ha} ha · {field.crop?.crop_type || 'No crop'}</p>
+
+      {/* Copernicus Satellite View */}
+      <SatelliteViewer lat={field.center.lat} lng={field.center.lng} />
 
       {a && (
         <>
