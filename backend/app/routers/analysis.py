@@ -1,33 +1,12 @@
 from fastapi import APIRouter, HTTPException
 from app.database import get_supabase
+from app.services.copernicus import fetch_indices, get_access_token
 from app.services.openmeteo import fetch_weather, get_soil_moisture
 from app.services.soilgrids import fetch_soil
-from app.services.copernicus import fetch_indices, get_access_token
+from app.ml.scoring import compute_health_score, compute_soil_score, compute_yield_potential, compute_disease_risk, compute_irrigation_need
 import asyncio
 
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
-
-def health_status(ndvi, moisture, ndmi):
-    if ndvi is None and moisture is None and ndmi is None:
-        return {"status": "unknown", "label": "No Data"}
-    scores = []
-    if ndvi is not None: scores.append(2 if ndvi > 0.4 else (1 if ndvi > 0.2 else 0))
-    if moisture is not None: scores.append(2 if moisture > 0.2 else (1 if moisture > 0.12 else 0))
-    if ndmi is not None: scores.append(2 if ndmi > 0.1 else (1 if ndmi > -0.1 else 0))
-    if not scores: return {"status": "unknown", "label": "No Data"}
-    avg = sum(scores) / len(scores)
-    if avg >= 1.5: return {"status": "good", "label": "Healthy"}
-    if avg >= 1.0: return {"status": "warning", "label": "Fair"}
-    return {"status": "critical", "label": "Critical"}
-
-def generate_alerts(ndvi, ndmi, sm, temp, hum, precip):
-    alerts = []
-    if ndvi is not None and ndvi < 0.15: alerts.append({"type": "vegetation", "severity": "critical", "message": "Bare soil or very sparse vegetation"})
-    if sm is not None and sm < 0.08: alerts.append({"type": "water", "severity": "critical", "message": "Critical soil moisture — irrigate immediately"})
-    elif sm is not None and sm < 0.15: alerts.append({"type": "water", "severity": "warning", "message": "Low soil moisture — consider irrigation"})
-    if ndmi is not None and ndmi < -0.1: alerts.append({"type": "water", "severity": "warning", "message": "Negative NDMI indicates water stress"})
-    if hum is not None and temp is not None and hum > 85 and temp > 22: alerts.append({"type": "disease", "severity": "warning", "message": "High humidity + warmth — fungal disease risk"})
-    return alerts
 
 @router.post("/field/{field_id}")
 async def analyze_field(field_id: str):
@@ -36,7 +15,8 @@ async def analyze_field(field_id: str):
         resp = supabase.from_("fields").select("*").eq("id", field_id).execute()
         if not resp.data: raise HTTPException(status_code=404, detail="Field not found")
         field = resp.data[0]
-    except: raise HTTPException(status_code=404, detail="Field not found")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
     lat, lng = field["center_lat"], field["center_lng"]
     bbox = [lng - 0.01, lat - 0.01, lng + 0.01, lat + 0.01]
@@ -52,19 +32,28 @@ async def analyze_field(field_id: str):
     temp = weather.get("current", {}).get("temperature_2m") if weather else None
     hum = weather.get("current", {}).get("relative_humidity_2m") if weather else None
 
+    health = compute_health_score(ndvi=ndvi, ndmi=ndmi, soil_moisture=sm, temperature=temp)
+    soil_score = compute_soil_score(ph=soil.get("ph"), soc=soil.get("soc"), clay=soil.get("clay"), nitrogen=soil.get("nitrogen"))
+    yield_pot = compute_yield_potential(ndvi=ndvi, soil_moisture=sm, soil_quality=soil_score.get("score"), temperature=temp)
+    disease = compute_disease_risk(temperature=temp, humidity=hum, ndvi=ndvi)
+    irrigation = compute_irrigation_need(soil_moisture=sm, temperature=temp)
+
     analysis = {
         "field_id": field_id,
-        "soil": {"ph": round(soil["ph"], 1) if soil.get("ph") else None, "organic_carbon": round(soil["soc"], 2) if soil.get("soc") else None, "clay": round(soil["clay"]) if soil.get("clay") else None, "sand": round(soil["sand"]) if soil.get("sand") else None, "moisture": round(sm * 100) if sm else None},
         "vegetation": {"ndvi": round(ndvi, 3) if ndvi else None, "ndmi": round(ndmi, 3) if ndmi else None},
+        "soil": {"ph": round(soil.get("ph"), 1) if soil.get("ph") else None, "organic_carbon": round(soil.get("soc"), 2) if soil.get("soc") else None, "clay": round(soil.get("clay")) if soil.get("clay") else None, "sand": round(soil.get("sand")) if soil.get("sand") else None, "silt": round(soil.get("silt")) if soil.get("silt") else None, "moisture": round(sm * 100) if sm is not None else None, "nitrogen": round(soil.get("nitrogen", 0), 2) if soil.get("nitrogen") else None},
         "weather": {"temp": round(temp) if temp else None, "humidity": round(hum) if hum else None},
-        "health": health_status(ndvi, sm, ndmi),
-        "alerts": generate_alerts(ndvi, ndmi, sm, temp, hum, None),
+        "health": health,
+        "soil_score": soil_score,
+        "yield_potential": yield_pot,
+        "disease_risk": disease,
+        "irrigation": irrigation,
     }
 
     try:
         supabase.from_("analyses").insert({"field_id": field_id, "data": analysis}).execute()
-        for a in analysis["alerts"]:
-            supabase.from_("alerts").insert({"field_id": field_id, "type": a["type"], "severity": a["severity"], "message": a["message"]}).execute()
+        for alert in health.get("alerts", []):
+            supabase.from_("alerts").insert({"field_id": field_id, "type": alert.get("type", "info"), "severity": alert.get("severity", "info"), "message": alert["message"]}).execute()
     except: pass
 
     return analysis
@@ -74,6 +63,6 @@ async def get_analysis(field_id: str):
     supabase = get_supabase()
     try:
         resp = supabase.from_("analyses").select("*").eq("field_id", field_id).order("created_at", desc=True).limit(1).execute()
-        if resp.data: return resp.data[0]
+        if resp.data: return resp.data[0]["data"]
     except: pass
     raise HTTPException(status_code=404, detail="No analysis found")
