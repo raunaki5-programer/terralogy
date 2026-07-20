@@ -5,52 +5,106 @@ import { useAppStore } from '@/store'
 export default function FieldDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { fields, analysis, fetchAnalysis, selectField } = useAppStore()
+  const { fields, analysis, fetchAnalysis } = useAppStore()
   const [loading, setLoading] = useState(false)
+  const [weather, setWeather] = useState<any>(null)
 
   const field = fields.find(f => f.id === id)
 
-  useEffect(() => { if (id) selectField(field || null) }, [id])
-
-  const analyze = async () => {
-    if (!id) return
-    setLoading(true)
-    await fetchAnalysis(id)
-    setLoading(false)
-  }
+  useEffect(() => {
+    if (field) {
+      setLoading(true)
+      Promise.all([
+        fetchAnalysis(field.id),
+        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/weather?lat=${field.center.lat}&lon=${field.center.lng}`).then(r => r.json()).catch(() => null),
+      ]).finally(() => setLoading(false))
+    }
+  }, [id])
 
   if (!field) return <div className="empty-state"><h3>Field not found</h3></div>
+  if (loading) return <div className="empty-state"><div className="loading-spinner" /></div>
+
+  const a = analysis
+  const w = weather?.current
 
   return (
     <div>
       <button className="btn btn-ghost btn-sm mb-3" onClick={() => navigate(-1)}>← Back</button>
       <h2 style={{ fontSize: 22, fontWeight: 600 }}>{field.name}</h2>
-      <div className="text-muted mb-4">Area: {field.area_ha} ha | {field.crop?.crop_type || 'No crop'}</div>
+      <p className="text-muted mb-4">{field.area_ha} ha | {field.crop?.crop_type || 'No crop planted'}</p>
 
-      <div className="card mb-3">
-        <div className="card-header"><span className="card-title">Field Analysis</span></div>
-        {!analysis ? (
-          <div className="text-center py-4">
-            <p className="text-muted mb-3">Run analysis to get satellite indices, soil health, and weather data.</p>
-            <button className="btn btn-primary" onClick={analyze} disabled={loading}>{loading ? 'Analyzing...' : 'Run Analysis'}</button>
-          </div>
-        ) : (
-          <div>
-            <div className="grid-3 mb-3">
-              <div className="stat-card"><div className="stat-value">{analysis.vegetation.ndvi ?? '-'}</div><div className="stat-label">NDVI</div></div>
-              <div className="stat-card"><div className="stat-value">{analysis.soil.moisture ?? '-'}%</div><div className="stat-label">Soil Moisture</div></div>
-              <div className="stat-card"><div className="stat-value" style={{ color: analysis.health.status === 'good' ? '#00d4aa' : '#ef4444' }}>{analysis.health.label}</div><div className="stat-label">Health</div></div>
+      {/* Health score */}
+      {a && (
+        <div className="card mb-3" style={{ borderLeft: `4px solid ${a.health?.status === 'good' ? '#00d4aa' : a.health?.status === 'warning' ? '#f59e0b' : '#ef4444'}` }}>
+          <div className="flex items-center justify-between">
+            <div><div className="card-title">Field Health</div><div style={{ fontSize: 28, fontWeight: 700, color: a.health?.status === 'good' ? '#00d4aa' : '#f59e0b' }}>{a.health?.label || 'Unknown'}</div></div>
+            <div style={{ textAlign: 'right', fontSize: 13, color: 'var(--text-secondary)' }}>
+              <div>NDVI: {a.vegetation?.ndvi ?? '—'}</div>
+              <div>NDMI: {a.vegetation?.ndmi ?? '—'}</div>
             </div>
-            {analysis.soil.ph && <div className="grid-2"><div className="text-muted">pH: {analysis.soil.ph}</div><div className="text-muted">Carbon: {analysis.soil.organic_carbon}%</div></div>}
-            {analysis.alerts.length > 0 && (
-              <div className="mt-3">
-                <h4 style={{ fontWeight: 600, marginBottom: 8 }}>Alerts</h4>
-                {analysis.alerts.map((a, i) => <div key={i} className="alert-item unread"><div className="alert-dot" style={{ background: 'var(--danger)' }} /><div className="alert-message">{a.message}</div></div>)}
-              </div>
-            )}
           </div>
-        )}
+        </div>
+      )}
+
+      <div className="grid-2 mb-3">
+        {/* Weather */}
+        <div className="card">
+          <div className="card-header"><span className="card-title">☀️ Weather</span></div>
+          {w ? (
+            <div>
+              <div style={{ fontSize: 28, fontWeight: 700 }}>{w.temperature_2m}°C</div>
+              <div className="grid-2 mt-2" style={{ gap: 8 }}>
+                <div className="text-muted" style={{ fontSize: 13 }}>Humidity: {w.relative_humidity_2m}%</div>
+                <div className="text-muted" style={{ fontSize: 13 }}>Wind: {w.wind_speed_10m} km/h</div>
+              </div>
+            </div>
+          ) : <div className="text-muted">Loading weather...</div>}
+        </div>
+
+        {/* Soil */}
+        <div className="card">
+          <div className="card-header"><span className="card-title">🧪 Soil</span></div>
+          {a?.soil ? (
+            <div>
+              <div className="grid-3" style={{ gap: 12 }}>
+                <div><div className="stat-value" style={{ fontSize: 18 }}>{a.soil.ph ?? '—'}</div><div className="stat-label">pH</div></div>
+                <div><div className="stat-value" style={{ fontSize: 18 }}>{a.soil.organic_carbon ?? '—'}%</div><div className="stat-label">Carbon</div></div>
+                <div><div className="stat-value" style={{ fontSize: 18 }}>{a.soil.moisture ?? '—'}%</div><div className="stat-label">Moisture</div></div>
+              </div>
+              <div className="grid-3 mt-2" style={{ gap: 8 }}>
+                <div className="text-muted" style={{ fontSize: 13 }}>Clay: {a.soil.clay ?? '—'}%</div>
+                <div className="text-muted" style={{ fontSize: 13 }}>Sand: {a.soil.sand ?? '—'}%</div>
+                <div className="text-muted" style={{ fontSize: 13 }}>Silt: {a.soil.silt ?? '—'}%</div>
+              </div>
+            </div>
+          ) : <div className="text-muted">No soil data. Run analysis first.</div>}
+        </div>
       </div>
+
+      {/* Alerts */}
+      {a?.alerts && a.alerts.length > 0 && (
+        <div className="card mb-3">
+          <div className="card-header"><span className="card-title">Alerts ({a.alerts.length})</span></div>
+          {a.alerts.map((al: any, i: number) => (
+            <div key={i} className="alert-item unread">
+              <div className="alert-dot" style={{ background: al.severity === 'critical' ? 'var(--danger)' : 'var(--warning)' }} />
+              <div className="alert-message">{al.message}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Crop info */}
+      {field.crop && (
+        <div className="card">
+          <div className="card-header"><span className="card-title">🌱 Crop</span></div>
+          <div className="grid-3" style={{ gap: 12 }}>
+            <div><div className="stat-label">Type</div><div style={{ fontWeight: 600 }}>{field.crop.crop_type}</div></div>
+            <div><div className="stat-label">Variety</div><div style={{ fontWeight: 600 }}>{field.crop.variety || '—'}</div></div>
+            <div><div className="stat-label">Planted</div><div style={{ fontWeight: 600 }}>{field.crop.planting_date || '—'}</div></div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -29,7 +29,7 @@ export interface Crop {
 
 export interface FieldAnalysis {
   field_id: string
-  soil: { ph: number | null; organic_carbon: number | null; clay: number | null; sand: number | null; moisture: number | null }
+  soil: { ph: number | null; organic_carbon: number | null; clay: number | null; sand: number | null; silt: number | null; moisture: number | null }
   vegetation: { ndvi: number | null; ndmi: number | null }
   weather: { temp: number | null; humidity: number | null }
   health: { status: string; label: string }

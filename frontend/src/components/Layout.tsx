@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAppStore } from '@/store'
+import ChatWidget from './ChatWidget'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '◉' },
@@ -33,6 +34,7 @@ export default function Layout() {
         </header>
         <main className="main-content"><Outlet /></main>
       </div>
+      <ChatWidget />
     </div>
   )
 }
