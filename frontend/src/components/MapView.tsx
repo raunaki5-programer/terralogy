@@ -11,10 +11,23 @@ export default function MapView({ farms, onFarmClick }: Props) {
     import('maplibre-gl').then(({ default: maplibregl }) => {
       const map = new maplibregl.Map({
         container: container.current!,
-        style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+        style: {
+          version: 8,
+          sources: {
+            'esri-satellite': {
+              type: 'raster',
+              tiles: ['https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+              tileSize: 256,
+              attribution: '&copy; Esri',
+              maxzoom: 19,
+            },
+          },
+          layers: [{ id: 'satellite', type: 'raster', source: 'esri-satellite' }],
+        },
         center: [78, 22],
         zoom: 4.5,
-        attributionControl: false
+        maxZoom: 19,
+        attributionControl: false,
       })
       map.addControl(new maplibregl.NavigationControl(), 'top-right')
 
