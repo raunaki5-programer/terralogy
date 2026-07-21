@@ -11,17 +11,35 @@ router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 async def analyze_area(lat: float, lng: float):
     """Full enterprise analysis for any lat/lng — no field required."""
     bbox = [lng - 0.01, lat - 0.01, lng + 0.01, lat + 0.01]
-    try:
-        token = await get_access_token()
-    except Exception as e:
-        return {"error": f"Copernicus auth failed: {e}", "vegetation": {"ndvi": None, "ndmi": None}}
 
-    try:
-        indices, weather, soil = await asyncio.gather(
-            fetch_indices(bbox, token), fetch_weather(lat, lng), fetch_soil(lat, lng)
-        )
-    except Exception as e:
-        return {"error": f"Data fetch failed: {e}"}
+    # Fetch all data in parallel — if one fails, others still return
+    async def safe_indices():
+        try:
+            token = await get_access_token()
+            return await fetch_indices(bbox, token)
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def safe_weather():
+        try:
+            return await fetch_weather(lat, lng)
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def safe_soil():
+        try:
+            return await fetch_soil(lat, lng)
+        except Exception as e:
+            return {"error": str(e)}
+
+    indices, weather, soil = await asyncio.gather(safe_indices(), safe_weather(), safe_soil())
+
+    if isinstance(indices, dict) and "error" in indices:
+        indices = {"ndvi": None, "ndmi": None}
+    if isinstance(weather, dict) and "error" in weather:
+        weather = {"current": {}, "hourly": {}}
+    if isinstance(soil, dict) and "error" in soil:
+        soil = {"ph": None, "soc": None, "clay": None, "sand": None, "silt": None}
 
     ndvi = indices.get("ndvi", {}).get("mean") if indices else None
     ndmi = indices.get("ndmi", {}).get("mean") if indices else None
@@ -73,13 +91,33 @@ async def analyze_field(field_id: str):
     lat, lng = field["center_lat"], field["center_lng"]
     bbox = [lng - 0.01, lat - 0.01, lng + 0.01, lat + 0.01]
 
-    try:
-        token = await get_access_token()
-        indices, weather, soil = await asyncio.gather(
-            fetch_indices(bbox, token), fetch_weather(lat, lng), fetch_soil(lat, lng)
-        )
-    except Exception as e:
-        return {"error": f"Analysis failed: {e}"}
+    async def safe_indices():
+        try:
+            token = await get_access_token()
+            return await fetch_indices(bbox, token)
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def safe_weather():
+        try:
+            return await fetch_weather(lat, lng)
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def safe_soil():
+        try:
+            return await fetch_soil(lat, lng)
+        except Exception as e:
+            return {"error": str(e)}
+
+    indices, weather, soil = await asyncio.gather(safe_indices(), safe_weather(), safe_soil())
+
+    if isinstance(indices, dict) and "error" in indices:
+        indices = {"ndvi": None, "ndmi": None}
+    if isinstance(weather, dict) and "error" in weather:
+        weather = {"current": {}, "hourly": {}}
+    if isinstance(soil, dict) and "error" in soil:
+        soil = {"ph": None, "soc": None, "clay": None, "sand": None, "silt": None}
 
     ndvi = indices.get("ndvi", {}).get("mean") if indices else None
     ndmi = indices.get("ndmi", {}).get("mean") if indices else None
