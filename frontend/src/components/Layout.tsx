@@ -1,6 +1,4 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { useAppStore } from '@/store'
-import ChatWidget from './ChatWidget'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '◉' },
@@ -11,30 +9,35 @@ const navItems = [
 
 export default function Layout() {
   const location = useLocation()
-  const { sidebarOpen, toggleSidebar, unreadAlerts } = useAppStore()
   const isActive = (path: string) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
 
   return (
     <div className="app-layout">
-      <aside className={`sidebar ${sidebarOpen ? '' : 'collapsed'}`}>
-        <div className="sidebar-header"><Link to="/" className="sidebar-logo">Terralogy</Link></div>
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <Link to="/" className="sidebar-logo">Terralogy</Link>
+          <div className="sidebar-tagline">Farm Intelligence Platform</div>
+        </div>
         <nav className="sidebar-nav">
           {navItems.map((item) => (
             <Link key={item.path} to={item.path} className={`nav-item ${isActive(item.path) ? 'active' : ''}`}>
-              <span className="nav-icon">{item.icon}</span><span className="nav-label">{item.label}</span>
-              {item.path === '/alerts' && unreadAlerts > 0 && <span className="nav-badge">{unreadAlerts}</span>}
+              <span className="nav-icon">{item.icon}</span>
+              <span className="nav-label">{item.label}</span>
             </Link>
           ))}
         </nav>
       </aside>
       <div className="main-area">
         <header className="topbar">
-          <button className="btn-ghost btn-icon" onClick={toggleSidebar}>☰</button>
-          <div className="topbar-title">{navItems.find(n => isActive(n.path))?.label || 'Terralogy'}</div>
+          <div>
+            <div className="topbar-title">{navItems.find(n => isActive(n.path))?.label || 'Terralogy'}</div>
+            <div className="topbar-subtitle">Enterprise Farm Monitoring</div>
+          </div>
         </header>
-        <main className="main-content"><Outlet /></main>
+        <main className="main-content">
+          <Outlet />
+        </main>
       </div>
-      <ChatWidget />
     </div>
   )
 }
