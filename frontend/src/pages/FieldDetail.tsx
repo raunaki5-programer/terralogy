@@ -4,6 +4,8 @@ import type { Field } from '@/types'
 
 const API = 'https://terralogy-api-v2.onrender.com'
 
+type Tab = 'overview' | 'vegetation' | 'soil' | 'weather'
+
 export default function FieldDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -11,6 +13,7 @@ export default function FieldDetail() {
   const [analysis, setAnalysis] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
+  const [tab, setTab] = useState<Tab>('overview')
 
   useEffect(() => {
     if (!id) return
@@ -41,103 +44,187 @@ export default function FieldDetail() {
 
   return (
     <div>
-      <button className="btn btn-ghost btn-sm mb-3" onClick={() => navigate(-1)}>← Back</button>
-      <div className="flex justify-between items-start mb-6">
+      <button className="btn btn-ghost btn-sm mb-4" onClick={() => navigate(-1)}>← Back</button>
+
+      <div className="detail-header">
         <div>
-          <h2 style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.5 }}>{field.name}</h2>
-          <div className="text-muted">{field.area_ha} hectares</div>
+          <h2>{field.name}</h2>
+          <div className="detail-meta">{field.area_ha} hectares</div>
         </div>
-        <button className="btn btn-primary" onClick={handleAnalyze} disabled={analyzing}>{analyzing ? 'Analyzing...' : 'Run Analysis'}</button>
+        <button className="btn btn-primary btn-sm" onClick={handleAnalyze} disabled={analyzing}>
+          {analyzing ? 'Analyzing...' : 'Run Analysis'}
+        </button>
       </div>
 
-      {a ? (
-        <>
-          <div className="data-panel mb-4">
-            <div className="data-header">
-              <div>
-                <div className="data-title">Field Health Analysis</div>
-                <div className="data-subtitle">Satellite + Soil + Weather intelligence</div>
-              </div>
-              <span className={`badge badge-${a.health?.status === 'good' ? 'success' : a.health?.status === 'warning' ? 'warning' : 'critical'}`}>{a.health?.label || 'Unknown'}</span>
-            </div>
-
-            <div className="health-section">
-              <div className="health-gauge">
-                <svg viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border)" strokeWidth="8" />
-                  <circle cx="50" cy="50" r="42" fill="none" stroke={a.health?.score >= 75 ? '#10b981' : a.health?.score >= 50 ? '#f59e0b' : '#ef4444'} strokeWidth="8" strokeDasharray={`${(a.health?.score || 0) * 2.64} 264`} strokeLinecap="round" />
-                </svg>
-                <div className="health-gauge-text" style={{ color: a.health?.score >= 75 ? '#10b981' : a.health?.score >= 50 ? '#f59e0b' : '#ef4444' }}>{a.health?.score ?? '—'}</div>
-              </div>
-              <div className="health-info">
-                <div className="health-label">{a.health?.label || 'No Data'}</div>
-                <div className="health-desc">Based on NDVI, soil moisture, and temperature</div>
-              </div>
-              <div className="yield-info">
-                <div className="yield-value">{a.yield_potential?.estimated_tons_ha ?? '—'}<span className="yield-unit"> t/ha</span></div>
-                <div className="yield-label">{a.yield_potential?.rating || 'Yield Potential'}</div>
-              </div>
-            </div>
-
-            <div className="metrics-grid">
-              <div className="metric-card">
-                <div className="metric-icon">🌿</div>
-                <div className="metric-label">NDVI</div>
-                <div className={`metric-value ${a.vegetation?.ndvi >= 0.4 ? 'good' : a.vegetation?.ndvi >= 0.2 ? 'warning' : 'danger'}`}>{a.vegetation?.ndvi ?? '—'}</div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-icon">💧</div>
-                <div className="metric-label">NDMI</div>
-                <div className="metric-value info">{a.vegetation?.ndmi ?? '—'}</div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-icon">🧪</div>
-                <div className="metric-label">Soil pH</div>
-                <div className="metric-value">{a.soil?.ph ?? '—'}</div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-icon">💦</div>
-                <div className="metric-label">Moisture</div>
-                <div className="metric-value">{a.soil?.moisture ?? '—'}<span className="metric-unit">%</span></div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-icon">🦠</div>
-                <div className="metric-label">Disease Risk</div>
-                <div className={`metric-value ${a.disease_risk?.risk_level === 'High' ? 'danger' : 'warning'}`}>{a.disease_risk?.risk_score ?? 0}<span className="metric-unit">%</span></div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-icon">🚰</div>
-                <div className="metric-label">Irrigation</div>
-                <div className="metric-value info">{a.irrigation?.need_mm ?? 0}<span className="metric-unit">mm</span></div>
-              </div>
-            </div>
-
-            {a.soil?.organic_carbon && (
-              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', gap: 24, fontSize: 13, color: 'var(--text-2)' }}>
-                <span>Carbon: <strong>{a.soil.organic_carbon}%</strong></span>
-                <span>Clay: <strong>{a.soil.clay}%</strong></span>
-                <span>Sand: <strong>{a.soil.sand}%</strong></span>
-                <span>Nitrogen: <strong>{a.soil.nitrogen}%</strong></span>
-              </div>
-            )}
-
-            {a.health?.alerts?.length > 0 && (
-              <div style={{ marginTop: 16, padding: 14, background: 'rgba(239, 68, 68, 0.08)', borderRadius: 8, borderLeft: '3px solid var(--danger)' }}>
-                <div className="font-semibold mb-2" style={{ color: 'var(--danger)' }}>⚠ Field Alerts</div>
-                {a.health.alerts.map((al: any, i: number) => (
-                  <div key={i} style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 4 }}>• {al.message}</div>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="empty-state">
+      {!a ? (
+        <div className="empty-state" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 48 }}>
           <div className="empty-state-icon">🛰</div>
           <h3>No analysis yet</h3>
           <p>Run satellite analysis to see NDVI, soil health, yield predictions, and disease risk</p>
           <button className="btn btn-primary" onClick={handleAnalyze} disabled={analyzing}>{analyzing ? 'Analyzing...' : 'Run Analysis'}</button>
         </div>
+      ) : (
+        <>
+          <div className="tabs">
+            {(['overview', 'vegetation', 'soil', 'weather'] as Tab[]).map(t => (
+              <button key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
+                {t === 'overview' ? 'Overview' : t === 'vegetation' ? 'Vegetation' : t === 'soil' ? 'Soil' : 'Weather'}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'overview' && (
+            <div className="data-panel" style={{ marginTop: 0 }}>
+              <div className="health-section">
+                <div className="health-gauge">
+                  <svg viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border)" strokeWidth="8" />
+                    <circle cx="50" cy="50" r="42" fill="none" stroke={a.health?.score >= 75 ? '#22c55e' : a.health?.score >= 50 ? '#f59e0b' : '#ef4444'} strokeWidth="8" strokeDasharray={`${(a.health?.score || 0) * 2.64} 264`} strokeLinecap="round" />
+                  </svg>
+                  <div className="health-gauge-text" style={{ color: a.health?.score >= 75 ? '#22c55e' : a.health?.score >= 50 ? '#f59e0b' : '#ef4444' }}>{a.health?.score ?? '—'}</div>
+                </div>
+                <div className="health-info">
+                  <div className="health-label">{a.health?.label || 'No Data'}</div>
+                  <div className="health-desc">Based on NDVI, soil moisture, and temperature</div>
+                </div>
+                <div className="yield-info">
+                  <div className="yield-value">{a.yield_potential?.estimated_tons_ha ?? '—'}<span className="yield-unit"> t/ha</span></div>
+                  <div className="yield-label">{a.yield_potential?.rating || 'Yield Potential'}</div>
+                </div>
+              </div>
+
+              <div className="metrics-grid">
+                <div className="metric-card">
+                  <div className="metric-icon">🌿</div>
+                  <div className="metric-label">NDVI</div>
+                  <div className={`metric-value ${a.vegetation?.ndvi >= 0.4 ? 'good' : a.vegetation?.ndvi >= 0.2 ? 'warning' : 'danger'}`}>{a.vegetation?.ndvi ?? '—'}</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-icon">💧</div>
+                  <div className="metric-label">NDMI</div>
+                  <div className="metric-value info">{a.vegetation?.ndmi ?? '—'}</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-icon">🧪</div>
+                  <div className="metric-label">Soil pH</div>
+                  <div className="metric-value">{a.soil?.ph ?? '—'}</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-icon">💦</div>
+                  <div className="metric-label">Moisture</div>
+                  <div className="metric-value">{a.soil?.moisture ?? '—'}<span className="metric-unit">%</span></div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-icon">🦠</div>
+                  <div className="metric-label">Disease Risk</div>
+                  <div className={`metric-value ${a.disease_risk?.risk_level === 'High' ? 'danger' : 'warning'}`}>{a.disease_risk?.risk_score ?? 0}<span className="metric-unit">%</span></div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-icon">🚰</div>
+                  <div className="metric-label">Irrigation</div>
+                  <div className="metric-value info">{a.irrigation?.need_mm ?? 0}<span className="metric-unit">mm</span></div>
+                </div>
+              </div>
+
+              {a.health?.alerts?.length > 0 && (
+                <div style={{ marginTop: 16, padding: 12, background: 'var(--danger-dim)', borderRadius: 8, borderLeft: '3px solid var(--danger)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--danger)', marginBottom: 6 }}>&#9888; Field Alerts</div>
+                  {a.health.alerts.map((al: any, i: number) => (
+                    <div key={i} style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 3 }}>&bull; {al.message}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === 'vegetation' && (
+            <div className="data-panel" style={{ marginTop: 0 }}>
+              <div className="data-title mb-4">Vegetation Indices</div>
+              <div className="grid-2">
+                <div className="metric-card" style={{ textAlign: 'left', padding: 20 }}>
+                  <div className="metric-label" style={{ fontSize: 11 }}>NDVI (Normalized Difference Vegetation Index)</div>
+                  <div className="metric-value" style={{ fontSize: 32, marginTop: 8 }}>{a.vegetation?.ndvi ?? '—'}</div>
+                  <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>
+                    {a.vegetation?.ndvi >= 0.4 ? 'Dense vegetation, healthy crops' : a.vegetation?.ndvi >= 0.2 ? 'Moderate vegetation cover' : 'Sparse or stressed vegetation'}
+                  </div>
+                </div>
+                <div className="metric-card" style={{ textAlign: 'left', padding: 20 }}>
+                  <div className="metric-label" style={{ fontSize: 11 }}>NDMI (Normalized Difference Moisture Index)</div>
+                  <div className="metric-value" style={{ fontSize: 32, marginTop: 8 }}>{a.vegetation?.ndmi ?? '—'}</div>
+                  <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>
+                    {a.vegetation?.ndmi >= 0.2 ? 'High moisture content' : a.vegetation?.ndmi >= 0 ? 'Moderate moisture' : 'Low moisture, possible drought stress'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'soil' && (
+            <div className="data-panel" style={{ marginTop: 0 }}>
+              <div className="data-title mb-4">Soil Analysis</div>
+              <div className="grid-4">
+                <div className="metric-card" style={{ textAlign: 'left', padding: 16 }}>
+                  <div className="metric-label">pH Level</div>
+                  <div className="metric-value" style={{ fontSize: 24 }}>{a.soil?.ph ?? '—'}</div>
+                  <div className="text-muted text-sm mt-2">
+                    {a.soil?.ph && (a.soil.ph < 6 ? 'Acidic' : a.soil.ph > 7.5 ? 'Alkaline' : 'Neutral')}
+                  </div>
+                </div>
+                <div className="metric-card" style={{ textAlign: 'left', padding: 16 }}>
+                  <div className="metric-label">Moisture</div>
+                  <div className="metric-value" style={{ fontSize: 24 }}>{a.soil?.moisture ?? '—'}<span className="metric-unit">%</span></div>
+                </div>
+                <div className="metric-card" style={{ textAlign: 'left', padding: 16 }}>
+                  <div className="metric-label">Organic Carbon</div>
+                  <div className="metric-value" style={{ fontSize: 24 }}>{a.soil?.organic_carbon ?? '—'}<span className="metric-unit">%</span></div>
+                </div>
+                <div className="metric-card" style={{ textAlign: 'left', padding: 16 }}>
+                  <div className="metric-label">Nitrogen</div>
+                  <div className="metric-value" style={{ fontSize: 24 }}>{a.soil?.nitrogen ?? '—'}<span className="metric-unit">%</span></div>
+                </div>
+              </div>
+              {a.soil?.clay && (
+                <div style={{ marginTop: 16, padding: 16, background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                  <div className="text-muted text-sm mb-3">Soil Composition</div>
+                  <div style={{ display: 'flex', gap: 24, fontSize: 13 }}>
+                    <span>Sand: <strong>{a.soil.sand}%</strong></span>
+                    <span>Silt: <strong>{a.soil.silt}%</strong></span>
+                    <span>Clay: <strong>{a.soil.clay}%</strong></span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === 'weather' && (
+            <div className="data-panel" style={{ marginTop: 0 }}>
+              <div className="data-title mb-4">Current Weather</div>
+              <div className="grid-4">
+                <div className="metric-card" style={{ textAlign: 'left', padding: 16 }}>
+                  <div className="metric-label">Temperature</div>
+                  <div className="metric-value" style={{ fontSize: 24 }}>{a.weather?.temp ?? '—'}<span className="metric-unit">°C</span></div>
+                </div>
+                <div className="metric-card" style={{ textAlign: 'left', padding: 16 }}>
+                  <div className="metric-label">Humidity</div>
+                  <div className="metric-value" style={{ fontSize: 24 }}>{a.weather?.humidity ?? '—'}<span className="metric-unit">%</span></div>
+                </div>
+                <div className="metric-card" style={{ textAlign: 'left', padding: 16 }}>
+                  <div className="metric-label">Disease Risk</div>
+                  <div className={`metric-value ${a.disease_risk?.risk_level === 'High' ? 'danger' : 'warning'}`} style={{ fontSize: 24 }}>{a.disease_risk?.risk_score ?? 0}<span className="metric-unit">%</span></div>
+                </div>
+                <div className="metric-card" style={{ textAlign: 'left', padding: 16 }}>
+                  <div className="metric-label">Irrigation Need</div>
+                  <div className="metric-value info" style={{ fontSize: 24 }}>{a.irrigation?.need_mm ?? 0}<span className="metric-unit">mm</span></div>
+                </div>
+              </div>
+              {a.weather?.temp && (
+                <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-3)' }}>
+                  {a.weather.temp > 35 ? 'High temperature — consider irrigation scheduling' : a.weather.temp > 25 ? 'Warm conditions favorable for growth' : a.weather.temp > 15 ? 'Moderate temperatures' : 'Cool conditions'}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

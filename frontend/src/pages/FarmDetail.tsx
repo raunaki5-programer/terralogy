@@ -53,56 +53,52 @@ export default function FarmDetail() {
 
   return (
     <div>
-      <button className="btn btn-ghost btn-sm mb-3" onClick={() => navigate('/farms')}>← Back to Farms</button>
-      <div className="flex justify-between items-start mb-6">
+      <button className="btn btn-ghost btn-sm mb-4" onClick={() => navigate('/farms')}>← Back to Farms</button>
+
+      <div className="detail-header">
         <div>
-          <h2 style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.5 }}>{farm.name}</h2>
-          <div className="text-muted">{farm.location.lat.toFixed(4)}, {farm.location.lng.toFixed(4)}</div>
+          <h2>{farm.name}</h2>
+          <div className="detail-meta">{farm.location.lat.toFixed(4)}, {farm.location.lng.toFixed(4)}</div>
         </div>
-        <button className="btn btn-danger btn-sm" onClick={handleDelete}>Delete Farm</button>
+        <button className="btn btn-danger btn-sm" onClick={handleDelete}>Delete</button>
       </div>
 
       <div className="flex justify-between items-center mb-4">
-        <h3 style={{ fontSize: 18, fontWeight: 600 }}>Fields ({fields.length})</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 600 }}>Fields ({fields.length})</h3>
         <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>+ Add Field</button>
       </div>
 
       {fields.length === 0 ? (
-        <div className="empty-state">
+        <div className="empty-state" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 40 }}>
           <div className="empty-state-icon">⊞</div>
           <h3>No fields yet</h3>
           <p>Add a field to start satellite analysis</p>
           <button className="btn btn-primary" onClick={() => setShowAdd(true)}>Add Field</button>
         </div>
       ) : (
-        <div className="grid-3">
+        <div className="field-grid">
           {fields.map((f) => (
-            <div key={f.id} className="card" style={{ cursor: 'pointer' }} onClick={() => navigate(`/fields/${f.id}`)}>
-              <div className="card-body">
-                <div className="flex justify-between items-start mb-2">
-                  <h4 style={{ fontWeight: 600 }}>{f.name}</h4>
-                  <span className="badge badge-neutral">{f.area_ha} ha</span>
-                </div>
-                {f.crop && <span className="badge badge-success">{f.crop.crop_type}</span>}
-              </div>
+            <div key={f.id} className="field-card" onClick={() => navigate(`/fields/${f.id}`)}>
+              <div className="field-card-name">{f.name}</div>
+              <div className="field-card-meta">{f.area_ha} ha{f.crop ? ` · ${f.crop.crop_type}` : ''}</div>
             </div>
           ))}
         </div>
       )}
 
       {showAdd && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div className="card" style={{ width: '90%', maxWidth: 420 }}>
-            <div className="card-header"><span className="card-title">Add Field</span></div>
-            <div className="card-body">
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <div className="modal-header">Add Field</div>
+            <div className="modal-body">
               <div className="form-group">
                 <label className="form-label">Field Name</label>
                 <input className="form-input" placeholder="e.g. Wheat Field" value={fName} onChange={e => setFName(e.target.value)} autoFocus />
               </div>
-              <div className="flex gap-2 justify-end">
-                <button className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleCreate} disabled={!fName.trim() || creating}>{creating ? 'Creating...' : 'Create Field'}</button>
-              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleCreate} disabled={!fName.trim() || creating}>{creating ? 'Creating...' : 'Create Field'}</button>
             </div>
           </div>
         </div>

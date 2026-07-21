@@ -58,35 +58,43 @@ export default function Dashboard() {
   const stats = {
     farms: farms.length,
     fields: farms.reduce((s, f) => s + (f.field_count || 0), 0),
-    alerts: alerts.filter(a => !a.read).length,
+    activeAlerts: alerts.filter(a => !a.read).length,
   }
 
   return (
     <div>
       <div className="stats-grid">
-        <div className="stat-card green">
+        <div className="stat-card">
           <div className="stat-icon green">🌾</div>
-          <div className="stat-label">Total Farms</div>
-          <div className="stat-value">{stats.farms}</div>
-          <div className="stat-desc">Active monitoring</div>
+          <div className="stat-info">
+            <div className="stat-label">Total Farms</div>
+            <div className="stat-value">{stats.farms}</div>
+            <div className="stat-desc">Registered farms</div>
+          </div>
         </div>
-        <div className="stat-card blue">
+        <div className="stat-card">
           <div className="stat-icon blue">⊞</div>
-          <div className="stat-label">Total Fields</div>
-          <div className="stat-value">{stats.fields}</div>
-          <div className="stat-desc">Across all farms</div>
+          <div className="stat-info">
+            <div className="stat-label">Total Fields</div>
+            <div className="stat-value">{stats.fields}</div>
+            <div className="stat-desc">Monitored fields</div>
+          </div>
         </div>
-        <div className="stat-card amber">
+        <div className="stat-card">
           <div className="stat-icon amber">⚡</div>
-          <div className="stat-label">Active Alerts</div>
-          <div className="stat-value">{stats.alerts}</div>
-          <div className="stat-desc">{stats.alerts > 0 ? 'Requires attention' : 'All clear'}</div>
+          <div className="stat-info">
+            <div className="stat-label">Active Alerts</div>
+            <div className="stat-value">{stats.activeAlerts}</div>
+            <div className="stat-desc">{stats.activeAlerts > 0 ? 'Requires attention' : 'All clear'}</div>
+          </div>
         </div>
-        <div className="stat-card red">
+        <div className="stat-card">
           <div className="stat-icon red">🛰</div>
-          <div className="stat-label">Satellite</div>
-          <div className="stat-value" style={{ fontSize: 18, paddingTop: 6 }}>Sentinel-2</div>
-          <div className="stat-desc">Updates every 5 days</div>
+          <div className="stat-info">
+            <div className="stat-label">Satellite</div>
+            <div className="stat-value" style={{ fontSize: 16, paddingTop: 4 }}>Sentinel-2</div>
+            <div className="stat-desc">Updates every 5 days</div>
+          </div>
         </div>
       </div>
 
@@ -117,9 +125,9 @@ export default function Dashboard() {
       )}
 
       {areaLoading && (
-        <div className="data-panel" style={{ textAlign: 'center', padding: 50 }}>
+        <div className="data-panel" style={{ textAlign: 'center', padding: 40 }}>
           <div className="loading-spinner" />
-          <div className="text-muted mt-3">Analyzing satellite, soil, and weather data...</div>
+          <div className="text-muted mt-3" style={{ fontSize: 13 }}>Analyzing satellite, soil, and weather data...</div>
         </div>
       )}
 
@@ -128,7 +136,7 @@ export default function Dashboard() {
           <div className="data-header">
             <div>
               <div className="data-title">Area Analysis</div>
-              <div className="data-subtitle">{areaData.area_ha} hectares • {areaData.lat?.toFixed(4)}, {areaData.lng?.toFixed(4)}</div>
+              <div className="data-subtitle">{areaData.area_ha} ha &middot; {areaData.lat?.toFixed(4)}, {areaData.lng?.toFixed(4)}</div>
             </div>
             <span className="badge badge-success">{areaData.shape}</span>
           </div>
@@ -137,9 +145,9 @@ export default function Dashboard() {
             <div className="health-gauge">
               <svg viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border)" strokeWidth="8" />
-                <circle cx="50" cy="50" r="42" fill="none" stroke={areaData.health?.score >= 75 ? '#10b981' : areaData.health?.score >= 50 ? '#f59e0b' : '#ef4444'} strokeWidth="8" strokeDasharray={`${(areaData.health?.score || 0) * 2.64} 264`} strokeLinecap="round" />
+                <circle cx="50" cy="50" r="42" fill="none" stroke={areaData.health?.score >= 75 ? '#22c55e' : areaData.health?.score >= 50 ? '#f59e0b' : '#ef4444'} strokeWidth="8" strokeDasharray={`${(areaData.health?.score || 0) * 2.64} 264`} strokeLinecap="round" />
               </svg>
-              <div className="health-gauge-text" style={{ color: areaData.health?.score >= 75 ? '#10b981' : areaData.health?.score >= 50 ? '#f59e0b' : '#ef4444' }}>{areaData.health?.score ?? '—'}</div>
+              <div className="health-gauge-text" style={{ color: areaData.health?.score >= 75 ? '#22c55e' : areaData.health?.score >= 50 ? '#f59e0b' : '#ef4444' }}>{areaData.health?.score ?? '—'}</div>
             </div>
             <div className="health-info">
               <div className="health-label">{areaData.health?.label || 'No Data'}</div>
@@ -185,7 +193,7 @@ export default function Dashboard() {
           </div>
 
           {areaData.soil?.organic_carbon && (
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', gap: 24, fontSize: 13, color: 'var(--text-2)' }}>
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)', display: 'flex', gap: 20, fontSize: 12, color: 'var(--text-2)' }}>
               <span>Carbon: <strong>{areaData.soil.organic_carbon}%</strong></span>
               <span>Clay: <strong>{areaData.soil.clay}%</strong></span>
               <span>Sand: <strong>{areaData.soil.sand}%</strong></span>
@@ -194,9 +202,9 @@ export default function Dashboard() {
           )}
 
           {areaData.health?.alerts?.length > 0 && (
-            <div style={{ marginTop: 16, padding: 14, background: 'rgba(239, 68, 68, 0.08)', borderRadius: 8, borderLeft: '3px solid var(--danger)' }}>
+            <div style={{ marginTop: 14, padding: 12, background: 'var(--danger-dim)', borderRadius: 8, borderLeft: '3px solid var(--danger)' }}>
               {areaData.health.alerts.map((a: any, i: number) => (
-                <div key={i} style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 4 }}>⚠ {a.message}</div>
+                <div key={i} style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 3 }}>&#9888; {a.message}</div>
               ))}
             </div>
           )}
@@ -226,20 +234,20 @@ export default function Dashboard() {
           <div className="card-header">
             <div>
               <div className="card-title">Recent Alerts</div>
-              <div className="card-subtitle">Critical notifications from your fields</div>
+              <div className="card-subtitle">Unresolved notifications</div>
             </div>
             <button className="btn btn-sm btn-ghost" onClick={() => navigate('/alerts')}>View All</button>
           </div>
           <div className="alert-list">
             {alerts.filter(a => !a.read).length === 0 ? (
-              <div className="empty-state" style={{ padding: 30 }}>
-                <div className="empty-state-icon">✓</div>
+              <div className="empty-state" style={{ padding: 24 }}>
+                <div className="empty-state-icon" style={{ fontSize: 32 }}>&#10003;</div>
                 <h3>All clear</h3>
-                <p>No active alerts. Your fields are healthy.</p>
+                <p>No active alerts.</p>
               </div>
             ) : alerts.filter(a => !a.read).slice(0, 5).map((a) => (
               <div key={a.id} className="alert-item" style={{ cursor: 'pointer' }} onClick={() => navigate('/alerts')}>
-                <div className={`alert-icon ${a.severity}`}>⚡</div>
+                <div className={`alert-icon ${a.severity}`}>&#9889;</div>
                 <div className="alert-content">
                   <div className="alert-title">{a.message}</div>
                   <div className="alert-meta">
@@ -255,15 +263,15 @@ export default function Dashboard() {
           <div className="card-header">
             <div>
               <div className="card-title">Quick Actions</div>
-              <div className="card-subtitle">Common tasks and shortcuts</div>
+              <div className="card-subtitle">Common tasks</div>
             </div>
           </div>
           <div className="card-body">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button className="btn" onClick={() => navigate('/farms')} style={{ justifyContent: 'flex-start' }}>⊞ View All Farms</button>
-              <button className="btn" onClick={() => navigate('/alerts')} style={{ justifyContent: 'flex-start' }}>⚡ View All Alerts</button>
-              <button className="btn" style={{ justifyContent: 'flex-start' }}>🛰 Satellite Analysis</button>
-              <button className="btn" style={{ justifyContent: 'flex-start' }}>📊 Generate Report</button>
+              <button className="btn" onClick={() => navigate('/alerts')} style={{ justifyContent: 'flex-start' }}>&#9889; View All Alerts</button>
+              <button className="btn" style={{ justifyContent: 'flex-start' }}>&#128752; Satellite Analysis</button>
+              <button className="btn" style={{ justifyContent: 'flex-start' }}>&#128202; Generate Report</button>
             </div>
           </div>
         </div>
