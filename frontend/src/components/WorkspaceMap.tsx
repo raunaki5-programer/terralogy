@@ -29,63 +29,72 @@ export default function WorkspaceMap({ onAreaSelect, onMapClick, activeTool }: P
     let cancelled = false
     import('maplibre-gl').then(({ default: ml }) => {
       if (cancelled || !container.current) return
-      const map = new ml.Map({
-        container: container.current!,
-        style: {
-          version: 8,
-          sources: {
-            esri: {
-              type: 'raster',
-              tiles: ['https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-              tileSize: 256,
-              maxzoom: 19,
+      try {
+        const map = new ml.Map({
+          container: container.current!,
+          style: {
+            version: 8,
+            sources: {
+              esri: {
+                type: 'raster',
+                tiles: ['https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+                tileSize: 256,
+                maxzoom: 19,
+              },
             },
+            layers: [{ id: 'satellite', type: 'raster', source: 'esri' }],
           },
-          layers: [{ id: 'satellite', type: 'raster', source: 'esri' }],
-        },
-        center: [78.9629, 20.5937],
-        zoom: 5,
-        maxZoom: 19,
-      })
-      map.addControl(new ml.NavigationControl({ showCompass: false, showZoom: false }), 'top-right')
-      mapRef.current = map
+          center: [78.9629, 20.5937],
+          zoom: 5,
+          maxZoom: 19,
+        })
+        map.on('load', () => {
+          if (cancelled) return
+          map.addControl(new ml.NavigationControl({ showCompass: false, showZoom: false }), 'top-right')
+          mapRef.current = map
 
-      map.on('click', (e: any) => {
-        const { lng, lat } = e.lngLat
-        const tool = toolRef.current
-        if (tool === 'select' || tool === 'pan') {
-          callbacksRef.current.onMapClick?.(lat, lng)
-        } else if (tool === 'rectangle') {
-          handleRectangleClick(lng, lat, map)
-        } else if (tool === 'circle') {
-          handleCircleClick(lng, lat, map)
-        } else if (tool === 'polygon') {
-          handlePolygonClick(lng, lat, map)
-        }
-      })
+          map.on('click', (e: any) => {
+            const { lng, lat } = e.lngLat
+            const tool = toolRef.current
+            if (tool === 'select' || tool === 'pan') {
+              callbacksRef.current.onMapClick?.(lat, lng)
+            } else if (tool === 'rectangle') {
+              handleRectangleClick(lng, lat, map)
+            } else if (tool === 'circle') {
+              handleCircleClick(lng, lat, map)
+            } else if (tool === 'polygon') {
+              handlePolygonClick(lng, lat, map)
+            }
+          })
 
-      map.on('dblclick', (e: any) => {
-        e.preventDefault()
-        const tool = toolRef.current
-        if (tool === 'polygon' && pointsRef.current.length >= 3) {
-          finishPolygon(map)
-        }
-      })
+          map.on('dblclick', (e: any) => {
+            e.preventDefault()
+            const tool = toolRef.current
+            if (tool === 'polygon' && pointsRef.current.length >= 3) {
+              finishPolygon(map)
+            }
+          })
 
-      map.on('mousemove', (e: any) => {
-        setMousePos({ lat: e.lngLat.lat, lng: e.lngLat.lng })
-        const tool = toolRef.current
-        if (tool === 'rectangle' && startRef.current && drawing) {
-          updateRectanglePreview(e.lngLat.lng, e.lngLat.lat, map)
-        } else if (tool === 'circle' && startRef.current && drawing) {
-          updateCirclePreview(e.lngLat.lng, e.lngLat.lat, map)
-        } else if (tool === 'polygon' && pointsRef.current.length > 0) {
-          updatePolygonPreview(e.lngLat.lng, e.lngLat.lat, map)
-        }
-      })
+          map.on('mousemove', (e: any) => {
+            setMousePos({ lat: e.lngLat.lat, lng: e.lngLat.lng })
+            const tool = toolRef.current
+            if (tool === 'rectangle' && startRef.current && drawing) {
+              updateRectanglePreview(e.lngLat.lng, e.lngLat.lat, map)
+            } else if (tool === 'circle' && startRef.current && drawing) {
+              updateCirclePreview(e.lngLat.lng, e.lngLat.lat, map)
+            } else if (tool === 'polygon' && pointsRef.current.length > 0) {
+              updatePolygonPreview(e.lngLat.lng, e.lngLat.lat, map)
+            }
+          })
 
-      map.on('zoom', () => setZoom(map.getZoom()))
-      map.on('move', () => { const c = map.getCenter(); setCenter([c.lng, c.lat]) })
+          map.on('zoom', () => setZoom(map.getZoom()))
+          map.on('move', () => { const c = map.getCenter(); setCenter([c.lng, c.lat]) })
+        })
+      } catch (e) {
+        console.error('Map initialization failed:', e)
+      }
+    }).catch(e => {
+      console.error('MapLibre import failed:', e)
     })
     return () => { cancelled = true; mapRef.current?.remove() }
   }, [])
