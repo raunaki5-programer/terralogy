@@ -29,7 +29,12 @@ export default function Alerts() {
 
   return (
     <div>
-      <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 16 }}>Alerts</h2>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.5 }}>Alerts</h2>
+          <div className="text-muted">{counts.all} total notifications</div>
+        </div>
+      </div>
 
       <div className="flex gap-2 mb-4">
         {([['all', 'All'], ['critical', 'Critical'], ['warning', 'Warning']] as const).map(([k, label]) => (
@@ -41,16 +46,17 @@ export default function Alerts() {
 
       {sorted.length === 0 ? (
         <div className="empty-state">
+          <div className="empty-state-icon">✓</div>
           <h3>No alerts</h3>
-          <p>{filter === 'all' ? 'All clear!' : `No ${filter} alerts.`}</p>
+          <p>{filter === 'all' ? 'All clear! Your fields are healthy.' : `No ${filter} alerts.`}</p>
         </div>
       ) : (
         <div className="card" style={{ padding: 0 }}>
           {sorted.map((a, i) => (
             <div key={a.id} className="alert-item" style={{ opacity: a.read ? 0.6 : 1 }} onClick={() => { if (!a.read) markRead(a.id); if (a.field_id) navigate(`/fields/${a.field_id}`) }}>
-              <div className={`alert-dot ${a.severity}`} />
+              <div className={`alert-icon ${a.severity}`}>⚡</div>
               <div className="alert-content">
-                <div className="alert-message">{a.message}</div>
+                <div className="alert-title">{a.message}</div>
                 <div className="alert-meta">
                   <span className={`badge badge-${a.severity}`}>{a.severity}</span>
                   {a.field_name && <span>{a.field_name}</span>}

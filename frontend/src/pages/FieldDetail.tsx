@@ -42,9 +42,9 @@ export default function FieldDetail() {
   return (
     <div>
       <button className="btn btn-ghost btn-sm mb-3" onClick={() => navigate(-1)}>← Back</button>
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start mb-6">
         <div>
-          <h2 style={{ fontSize: 24, fontWeight: 700 }}>{field.name}</h2>
+          <h2 style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.5 }}>{field.name}</h2>
           <div className="text-muted">{field.area_ha} hectares</div>
         </div>
         <button className="btn btn-primary" onClick={handleAnalyze} disabled={analyzing}>{analyzing ? 'Analyzing...' : 'Run Analysis'}</button>
@@ -54,64 +54,78 @@ export default function FieldDetail() {
         <>
           <div className="data-panel mb-4">
             <div className="data-header">
-              <div className="data-title">Field Health</div>
+              <div>
+                <div className="data-title">Field Health Analysis</div>
+                <div className="data-subtitle">Satellite + Soil + Weather intelligence</div>
+              </div>
               <span className={`badge badge-${a.health?.status === 'good' ? 'success' : a.health?.status === 'warning' ? 'warning' : 'critical'}`}>{a.health?.label || 'Unknown'}</span>
             </div>
-            <div className="health-score">
-              <div>
-                <div className="health-value" style={{ color: a.health?.score >= 75 ? '#00d4a0' : a.health?.score >= 50 ? '#f59e0b' : '#ef4444' }}>{a.health?.score ?? '—'}</div>
-                <div className="health-label">Score</div>
+
+            <div className="health-section">
+              <div className="health-gauge">
+                <svg viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border)" strokeWidth="8" />
+                  <circle cx="50" cy="50" r="42" fill="none" stroke={a.health?.score >= 75 ? '#10b981' : a.health?.score >= 50 ? '#f59e0b' : '#ef4444'} strokeWidth="8" strokeDasharray={`${(a.health?.score || 0) * 2.64} 264`} strokeLinecap="round" />
+                </svg>
+                <div className="health-gauge-text" style={{ color: a.health?.score >= 75 ? '#10b981' : a.health?.score >= 50 ? '#f59e0b' : '#ef4444' }}>{a.health?.score ?? '—'}</div>
               </div>
-              <div className="health-bar">
-                <div className="health-fill" style={{ width: `${a.health?.score || 0}%`, background: a.health?.score >= 75 ? '#00d4a0' : a.health?.score >= 50 ? '#f59e0b' : '#ef4444' }} />
+              <div className="health-info">
+                <div className="health-label">{a.health?.label || 'No Data'}</div>
+                <div className="health-desc">Based on NDVI, soil moisture, and temperature</div>
               </div>
-              <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                <div style={{ fontSize: 32, fontWeight: 700, color: '#f59e0b' }}>{a.yield_potential?.estimated_tons_ha ?? '—'} t/ha</div>
-                <div className="text-muted text-xs">{a.yield_potential?.rating || 'Yield Potential'}</div>
+              <div className="yield-info">
+                <div className="yield-value">{a.yield_potential?.estimated_tons_ha ?? '—'}<span className="yield-unit"> t/ha</span></div>
+                <div className="yield-label">{a.yield_potential?.rating || 'Yield Potential'}</div>
               </div>
             </div>
 
             <div className="metrics-grid">
               <div className="metric-card">
+                <div className="metric-icon">🌿</div>
                 <div className="metric-label">NDVI</div>
                 <div className={`metric-value ${a.vegetation?.ndvi >= 0.4 ? 'good' : a.vegetation?.ndvi >= 0.2 ? 'warning' : 'danger'}`}>{a.vegetation?.ndvi ?? '—'}</div>
               </div>
               <div className="metric-card">
+                <div className="metric-icon">💧</div>
                 <div className="metric-label">NDMI</div>
                 <div className="metric-value info">{a.vegetation?.ndmi ?? '—'}</div>
               </div>
               <div className="metric-card">
+                <div className="metric-icon">🧪</div>
                 <div className="metric-label">Soil pH</div>
                 <div className="metric-value">{a.soil?.ph ?? '—'}</div>
               </div>
               <div className="metric-card">
+                <div className="metric-icon">💦</div>
                 <div className="metric-label">Moisture</div>
                 <div className="metric-value">{a.soil?.moisture ?? '—'}<span className="metric-unit">%</span></div>
               </div>
               <div className="metric-card">
+                <div className="metric-icon">🦠</div>
                 <div className="metric-label">Disease Risk</div>
                 <div className={`metric-value ${a.disease_risk?.risk_level === 'High' ? 'danger' : 'warning'}`}>{a.disease_risk?.risk_score ?? 0}<span className="metric-unit">%</span></div>
               </div>
               <div className="metric-card">
+                <div className="metric-icon">🚰</div>
                 <div className="metric-label">Irrigation</div>
                 <div className="metric-value info">{a.irrigation?.need_mm ?? 0}<span className="metric-unit">mm</span></div>
               </div>
             </div>
 
             {a.soil?.organic_carbon && (
-              <div className="text-muted text-sm" style={{ padding: '12px 0', borderTop: '1px solid var(--border)' }}>
-                <span className="mr-4">Carbon: {a.soil.organic_carbon}%</span>
-                <span className="mr-4">Clay: {a.soil.clay}%</span>
-                <span className="mr-4">Sand: {a.soil.sand}%</span>
-                <span>Nitrogen: {a.soil.nitrogen}%</span>
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', gap: 24, fontSize: 13, color: 'var(--text-2)' }}>
+                <span>Carbon: <strong>{a.soil.organic_carbon}%</strong></span>
+                <span>Clay: <strong>{a.soil.clay}%</strong></span>
+                <span>Sand: <strong>{a.soil.sand}%</strong></span>
+                <span>Nitrogen: <strong>{a.soil.nitrogen}%</strong></span>
               </div>
             )}
 
             {a.health?.alerts?.length > 0 && (
-              <div style={{ marginTop: 16, padding: 12, background: 'rgba(239, 68, 68, 0.1)', borderRadius: 8, borderLeft: '3px solid #ef4444' }}>
-                <div className="font-semibold mb-2" style={{ color: '#ef4444' }}>⚠ Alerts</div>
+              <div style={{ marginTop: 16, padding: 14, background: 'rgba(239, 68, 68, 0.08)', borderRadius: 8, borderLeft: '3px solid var(--danger)' }}>
+                <div className="font-semibold mb-2" style={{ color: 'var(--danger)' }}>⚠ Field Alerts</div>
                 {a.health.alerts.map((al: any, i: number) => (
-                  <div key={i} style={{ fontSize: 13, color: '#ef4444', marginBottom: 4 }}>• {al.message}</div>
+                  <div key={i} style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 4 }}>• {al.message}</div>
                 ))}
               </div>
             )}
@@ -119,8 +133,9 @@ export default function FieldDetail() {
         </>
       ) : (
         <div className="empty-state">
+          <div className="empty-state-icon">🛰</div>
           <h3>No analysis yet</h3>
-          <p>Run satellite analysis to see NDVI, soil health, and yield predictions</p>
+          <p>Run satellite analysis to see NDVI, soil health, yield predictions, and disease risk</p>
           <button className="btn btn-primary" onClick={handleAnalyze} disabled={analyzing}>{analyzing ? 'Analyzing...' : 'Run Analysis'}</button>
         </div>
       )}

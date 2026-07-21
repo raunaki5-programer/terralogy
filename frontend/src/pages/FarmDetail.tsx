@@ -54,21 +54,22 @@ export default function FarmDetail() {
   return (
     <div>
       <button className="btn btn-ghost btn-sm mb-3" onClick={() => navigate('/farms')}>← Back to Farms</button>
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start mb-6">
         <div>
-          <h2 style={{ fontSize: 24, fontWeight: 700 }}>{farm.name}</h2>
+          <h2 style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.5 }}>{farm.name}</h2>
           <div className="text-muted">{farm.location.lat.toFixed(4)}, {farm.location.lng.toFixed(4)}</div>
         </div>
         <button className="btn btn-danger btn-sm" onClick={handleDelete}>Delete Farm</button>
       </div>
 
-      <div className="flex justify-between items-center mb-3">
-        <h3 style={{ fontSize: 16, fontWeight: 600 }}>Fields ({fields.length})</h3>
+      <div className="flex justify-between items-center mb-4">
+        <h3 style={{ fontSize: 18, fontWeight: 600 }}>Fields ({fields.length})</h3>
         <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>+ Add Field</button>
       </div>
 
       {fields.length === 0 ? (
         <div className="empty-state">
+          <div className="empty-state-icon">⊞</div>
           <h3>No fields yet</h3>
           <p>Add a field to start satellite analysis</p>
           <button className="btn btn-primary" onClick={() => setShowAdd(true)}>Add Field</button>
@@ -77,9 +78,13 @@ export default function FarmDetail() {
         <div className="grid-3">
           {fields.map((f) => (
             <div key={f.id} className="card" style={{ cursor: 'pointer' }} onClick={() => navigate(`/fields/${f.id}`)}>
-              <h4 style={{ fontWeight: 600, marginBottom: 4 }}>{f.name}</h4>
-              <div className="text-muted text-sm">{f.area_ha} hectares</div>
-              {f.crop && <span className="badge badge-neutral mt-2">{f.crop.crop_type}</span>}
+              <div className="card-body">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 style={{ fontWeight: 600 }}>{f.name}</h4>
+                  <span className="badge badge-neutral">{f.area_ha} ha</span>
+                </div>
+                {f.crop && <span className="badge badge-success">{f.crop.crop_type}</span>}
+              </div>
             </div>
           ))}
         </div>
@@ -87,15 +92,17 @@ export default function FarmDetail() {
 
       {showAdd && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div className="card" style={{ width: '90%', maxWidth: 400 }}>
+          <div className="card" style={{ width: '90%', maxWidth: 420 }}>
             <div className="card-header"><span className="card-title">Add Field</span></div>
-            <div className="form-group">
-              <label className="form-label">Field Name</label>
-              <input className="form-input" placeholder="Field name" value={fName} onChange={e => setFName(e.target.value)} autoFocus />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleCreate} disabled={!fName.trim() || creating}>{creating ? 'Creating...' : 'Create'}</button>
+            <div className="card-body">
+              <div className="form-group">
+                <label className="form-label">Field Name</label>
+                <input className="form-input" placeholder="e.g. Wheat Field" value={fName} onChange={e => setFName(e.target.value)} autoFocus />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>
+                <button className="btn btn-primary" onClick={handleCreate} disabled={!fName.trim() || creating}>{creating ? 'Creating...' : 'Create Field'}</button>
+              </div>
             </div>
           </div>
         </div>
