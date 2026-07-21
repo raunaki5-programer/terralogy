@@ -18,12 +18,16 @@ export default function MapView({ farms, onFarmClick, onMapClick, onAreaSelect }
   const [hint, setHint] = useState('Click on map to add farm')
   const startRef = useRef<[number, number] | null>(null)
   const pointsRef = useRef<[number, number][]>([])
+  const toolRef = useRef<Tool>('point')
+  const clickHandlersRef = useRef({ onMapClick, onAreaSelect, onFarmClick })
+
+  clickHandlersRef.current = { onMapClick, onAreaSelect, onFarmClick }
 
   useEffect(() => {
     if (!container.current) return
     let cancelled = false
     import('maplibre-gl').then(({ default: ml }) => {
-      if (cancelled) return
+      if (cancelled || !container.current) return
       const map = new ml.Map({
         container: container.current!,
         style: {
@@ -45,14 +49,53 @@ export default function MapView({ farms, onFarmClick, onMapClick, onAreaSelect }
       map.addControl(new ml.NavigationControl(), 'top-right')
       mapRef.current = map
 
+      function handleClick(lng: number, lat: number) {
+        const curTool = toolRef.current
+        if (curTool === 'point') {
+          clickHandlersRef.current.onMapClick?.(lat, lng)
+        } else if (curTool === 'rectangle') {
+          if (!startRef.current) {
+            startRef.current = [lng, lat]
+            setHint('Click opposite corner')
+          } else {
+            const [sLng, sLat] = startRef.current
+            finishShape([[sLng, sLat], [lng, sLat], [lng, lat], [sLng, lat], [sLng, sLat]], 'rectangle')
+            startRef.current = null
+            setHint('Click first corner')
+          }
+        } else if (curTool === 'circle') {
+          if (!startRef.current) {
+            startRef.current = [lng, lat]
+            setHint('Click edge of circle')
+          } else {
+            const [cLng, cLat] = startRef.current
+            const dx = lng - cLng, dy = lat - cLat
+            const r = Math.sqrt(dx * dx + dy * dy)
+            const ring: [number, number][] = []
+            for (let i = 0; i <= 64; i++) {
+              const a = (i / 64) * 2 * Math.PI
+              ring.push([cLng + r * Math.cos(a), cLat + r * Math.sin(a)])
+            }
+            finishShape(ring, 'circle')
+            startRef.current = null
+            setHint('Click center of circle')
+          }
+        } else if (curTool === 'polygon') {
+          pointsRef.current.push([lng, lat])
+          setHint(`${pointsRef.current.length} points — double-click to finish`)
+          if (pointsRef.current.length >= 2) {
+            renderPoly([...pointsRef.current, pointsRef.current[0]])
+          }
+        }
+      }
+
       map.on('click', (e: any) => {
-        const { lng, lat } = e.lngLat
-        handleClick(lng, lat)
+        handleClick(e.lngLat.lng, e.lngLat.lat)
       })
 
       map.on('dblclick', (e: any) => {
         e.preventDefault()
-        if (tool === 'polygon' && pointsRef.current.length >= 3) {
+        if (toolRef.current === 'polygon' && pointsRef.current.length >= 3) {
           finishShape([...pointsRef.current, pointsRef.current[0]], 'polygon')
           pointsRef.current = []
           setHint('Click to add polygon points')
@@ -61,10 +104,11 @@ export default function MapView({ farms, onFarmClick, onMapClick, onAreaSelect }
 
       map.on('mousemove', (e: any) => {
         const { lng, lat } = e.lngLat
-        if (tool === 'rectangle' && startRef.current) {
+        const curTool = toolRef.current
+        if (curTool === 'rectangle' && startRef.current) {
           const [sLng, sLat] = startRef.current
           renderPoly([[sLng, sLat], [lng, sLat], [lng, lat], [sLng, lat], [sLng, sLat]])
-        } else if (tool === 'circle' && startRef.current) {
+        } else if (curTool === 'circle' && startRef.current) {
           const [cLng, cLat] = startRef.current
           const dx = lng - cLng, dy = lat - cLat
           const r = Math.sqrt(dx * dx + dy * dy)
@@ -74,52 +118,13 @@ export default function MapView({ farms, onFarmClick, onMapClick, onAreaSelect }
             ring.push([cLng + r * Math.cos(a), cLat + r * Math.sin(a)])
           }
           renderPoly(ring)
-        } else if (tool === 'polygon' && pointsRef.current.length > 0) {
+        } else if (curTool === 'polygon' && pointsRef.current.length > 0) {
           renderPoly([...pointsRef.current, [lng, lat]])
         }
       })
     })
     return () => { cancelled = true; mapRef.current?.remove() }
   }, [])
-
-  function handleClick(lng: number, lat: number) {
-    if (tool === 'point') {
-      onMapClick?.(lat, lng)
-    } else if (tool === 'rectangle') {
-      if (!startRef.current) {
-        startRef.current = [lng, lat]
-        setHint('Click opposite corner')
-      } else {
-        const [sLng, sLat] = startRef.current
-        finishShape([[sLng, sLat], [lng, sLat], [lng, lat], [sLng, lat], [sLng, sLat]], 'rectangle')
-        startRef.current = null
-        setHint('Click first corner')
-      }
-    } else if (tool === 'circle') {
-      if (!startRef.current) {
-        startRef.current = [lng, lat]
-        setHint('Click edge of circle')
-      } else {
-        const [cLng, cLat] = startRef.current
-        const dx = lng - cLng, dy = lat - cLat
-        const r = Math.sqrt(dx * dx + dy * dy)
-        const ring: [number, number][] = []
-        for (let i = 0; i <= 64; i++) {
-          const a = (i / 64) * 2 * Math.PI
-          ring.push([cLng + r * Math.cos(a), cLat + r * Math.sin(a)])
-        }
-        finishShape(ring, 'circle')
-        startRef.current = null
-        setHint('Click center of circle')
-      }
-    } else if (tool === 'polygon') {
-      pointsRef.current.push([lng, lat])
-      setHint(`${pointsRef.current.length} points — double-click to finish`)
-      if (pointsRef.current.length >= 2) {
-        renderPoly([...pointsRef.current, pointsRef.current[0]])
-      }
-    }
-  }
 
   useEffect(() => {
     const map = mapRef.current
@@ -129,13 +134,14 @@ export default function MapView({ farms, onFarmClick, onMapClick, onAreaSelect }
       markersRef.current = farms.map((farm) => {
         const el = document.createElement('div')
         el.innerHTML = '<div style="background:#10b981;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);cursor:pointer" title="' + farm.name + '" />'
-        el.onclick = () => onFarmClick?.(farm)
+        el.onclick = () => clickHandlersRef.current.onFarmClick?.(farm)
         return new ml.Marker({ element: el }).setLngLat([farm.location.lng, farm.location.lat]).addTo(map)
       })
     })
-  }, [farms, onFarmClick])
+  }, [farms])
 
   useEffect(() => {
+    toolRef.current = tool
     const hints: Record<Tool, string> = {
       point: 'Click on map to add farm',
       rectangle: 'Click first corner',
@@ -189,7 +195,7 @@ export default function MapView({ farms, onFarmClick, onMapClick, onAreaSelect }
 
     let sumLat = 0, sumLng = 0
     ring.forEach(([lng, lat]) => { sumLat += lat; sumLng += lng })
-    onAreaSelect?.({ lat: sumLat / ring.length, lng: sumLng / ring.length, area_ha, shape })
+    clickHandlersRef.current.onAreaSelect?.({ lat: sumLat / ring.length, lng: sumLng / ring.length, area_ha, shape })
   }
 
   const tools: { key: Tool; icon: string; label: string }[] = [
