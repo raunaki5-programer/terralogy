@@ -4,275 +4,320 @@ interface Props {
   onAreaSelect?: (info: { lat: number; lng: number; area_ha: number; shape: string; coordinates: number[][] }) => void
   onMapClick?: (lat: number, lng: number) => void
   activeTool: string
+  onToolChange: (tool: string) => void
 }
 
-type Tool = 'select' | 'pan' | 'rectangle' | 'circle' | 'polygon'
-
-export default function WorkspaceMap({ onAreaSelect, onMapClick, activeTool }: Props) {
-  const container = useRef<HTMLDivElement>(null)
+export default function WorkspaceMap({ onAreaSelect, onMapClick, activeTool, onToolChange }: Props) {
+  const mapDiv = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
-  const [zoom, setZoom] = useState(4.5)
-  const [center, setCenter] = useState<[number, number]>([78.9629, 20.5937])
-  const [mousePos, setMousePos] = useState<{ lat: number; lng: number } | null>(null)
-  const [drawing, setDrawing] = useState(false)
-  const [coordinates, setCoordinates] = useState<number[][]>([])
   const startRef = useRef<[number, number] | null>(null)
   const pointsRef = useRef<[number, number][]>([])
-  const toolRef = useRef<string>('select')
-  const callbacksRef = useRef({ onAreaSelect, onMapClick })
+  const drawingRef = useRef(false)
+  const toolRef = useRef(activeTool)
+  const cbRef = useRef({ onAreaSelect, onMapClick })
 
-  useEffect(() => { toolRef.current = activeTool }, [activeTool])
-  useEffect(() => { callbacksRef.current = { onAreaSelect, onMapClick } }, [onAreaSelect, onMapClick])
+  const [zoom, setZoom] = useState(5)
+  const [center, setCenter] = useState<[number, number]>([78.9629, 20.5937])
+  const [mousePos, setMousePos] = useState<{ lat: number; lng: number } | null>(null)
+  const [hint, setHint] = useState('Select a draw tool, then click on the map')
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [mapReady, setMapReady] = useState(false)
 
   useEffect(() => {
-    if (!container.current) return
+    toolRef.current = activeTool
+    startRef.current = null
+    pointsRef.current = []
+    drawingRef.current = false
+    setIsDrawing(false)
+    clearLayer('preview')
+    const hints: Record<string, string> = {
+      select: 'Click map to place a point',
+      pan: 'Drag to pan the map',
+      rectangle: 'Click first corner, then opposite corner',
+      circle: 'Click center, then edge of circle',
+      polygon: 'Click points, double-click to finish (min 3)',
+    }
+    setHint(hints[activeTool] || 'Select a tool')
+    const map = mapRef.current
+    if (map) {
+      map.getCanvas().style.cursor = ['rectangle', 'circle', 'polygon'].includes(activeTool) ? 'crosshair' : ''
+      map.doubleClickZoom[activeTool === 'polygon' ? 'disable' : 'enable']()
+      map.dragPan[activeTool === 'pan' || activeTool === 'select' ? 'enable' : 'enable']()
+    }
+  }, [activeTool])
+
+  useEffect(() => {
+    cbRef.current = { onAreaSelect, onMapClick }
+  }, [onAreaSelect, onMapClick])
+
+  useEffect(() => {
+    if (!mapDiv.current) return
     let cancelled = false
-    import('maplibre-gl').then(({ default: ml }) => {
-      if (cancelled || !container.current) return
-      try {
-        const map = new ml.Map({
-          container: container.current!,
-          style: {
-            version: 8,
-            sources: {
-              esri: {
-                type: 'raster',
-                tiles: ['https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-                tileSize: 256,
-                maxzoom: 19,
-              },
+    let map: any = null
+
+    import('maplibre-gl').then(({ default: maplibregl }) => {
+      if (cancelled || !mapDiv.current) return
+
+      map = new maplibregl.Map({
+        container: mapDiv.current,
+        style: {
+          version: 8,
+          sources: {
+            esri: {
+              type: 'raster',
+              tiles: ['https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+              tileSize: 256,
+              attribution: 'Esri',
+              maxzoom: 19,
             },
-            layers: [{ id: 'satellite', type: 'raster', source: 'esri' }],
           },
-          center: [78.9629, 20.5937],
-          zoom: 5,
-          maxZoom: 19,
-        })
-        map.on('load', () => {
-          if (cancelled) return
-          map.addControl(new ml.NavigationControl({ showCompass: false, showZoom: false }), 'top-right')
-          mapRef.current = map
+          layers: [{ id: 'satellite', type: 'raster', source: 'esri' }],
+        },
+        center: [78.9629, 20.5937],
+        zoom: 5,
+        maxZoom: 18,
+      })
 
-          map.on('click', (e: any) => {
-            const { lng, lat } = e.lngLat
-            const tool = toolRef.current
-            if (tool === 'select' || tool === 'pan') {
-              callbacksRef.current.onMapClick?.(lat, lng)
-            } else if (tool === 'rectangle') {
-              handleRectangleClick(lng, lat, map)
-            } else if (tool === 'circle') {
-              handleCircleClick(lng, lat, map)
-            } else if (tool === 'polygon') {
-              handlePolygonClick(lng, lat, map)
+      mapRef.current = map
+
+      map.on('load', () => {
+        if (cancelled) return
+        setMapReady(true)
+        map.resize()
+      })
+
+      map.on('click', (e: any) => {
+        if (cancelled) return
+        const { lng, lat } = e.lngLat
+        const tool = toolRef.current
+
+        if (tool === 'select') {
+          cbRef.current.onMapClick?.(lat, lng)
+          return
+        }
+        if (tool === 'pan') return
+
+        if (tool === 'rectangle') {
+          if (!startRef.current) {
+            startRef.current = [lng, lat]
+            drawingRef.current = true
+            setIsDrawing(true)
+            setHint('Click opposite corner to finish rectangle')
+          } else {
+            const [sLng, sLat] = startRef.current
+            finishShape(
+              [[sLng, sLat], [lng, sLat], [lng, lat], [sLng, lat], [sLng, sLat]],
+              'rectangle'
+            )
+          }
+          return
+        }
+
+        if (tool === 'circle') {
+          if (!startRef.current) {
+            startRef.current = [lng, lat]
+            drawingRef.current = true
+            setIsDrawing(true)
+            setHint('Click edge of circle to finish')
+          } else {
+            const [cLng, cLat] = startRef.current
+            const r = Math.hypot(lng - cLng, lat - cLat)
+            const ring: number[][] = []
+            for (let i = 0; i <= 64; i++) {
+              const a = (i / 64) * Math.PI * 2
+              ring.push([cLng + r * Math.cos(a), cLat + r * Math.sin(a)])
             }
-          })
+            finishShape(ring, 'circle')
+          }
+          return
+        }
 
-          map.on('dblclick', (e: any) => {
-            e.preventDefault()
-            const tool = toolRef.current
-            if (tool === 'polygon' && pointsRef.current.length >= 3) {
-              finishPolygon(map)
-            }
-          })
+        if (tool === 'polygon') {
+          pointsRef.current.push([lng, lat])
+          drawingRef.current = true
+          setIsDrawing(true)
+          const n = pointsRef.current.length
+          setHint(n < 3 ? `${n} points — need at least 3, double-click to finish` : `${n} points — double-click to finish`)
+          if (n >= 2) {
+            setPreview([...pointsRef.current, pointsRef.current[0]])
+          }
+        }
+      })
 
-          map.on('mousemove', (e: any) => {
-            setMousePos({ lat: e.lngLat.lat, lng: e.lngLat.lng })
-            const tool = toolRef.current
-            if (tool === 'rectangle' && startRef.current && drawing) {
-              updateRectanglePreview(e.lngLat.lng, e.lngLat.lat, map)
-            } else if (tool === 'circle' && startRef.current && drawing) {
-              updateCirclePreview(e.lngLat.lng, e.lngLat.lat, map)
-            } else if (tool === 'polygon' && pointsRef.current.length > 0) {
-              updatePolygonPreview(e.lngLat.lng, e.lngLat.lat, map)
-            }
-          })
+      map.on('dblclick', (e: any) => {
+        e.preventDefault()
+        if (toolRef.current === 'polygon' && pointsRef.current.length >= 3) {
+          finishShape([...pointsRef.current, pointsRef.current[0]], 'polygon')
+        }
+      })
 
-          map.on('zoom', () => setZoom(map.getZoom()))
-          map.on('move', () => { const c = map.getCenter(); setCenter([c.lng, c.lat]) })
-        })
-      } catch (e) {
-        console.error('Map initialization failed:', e)
-      }
-    }).catch(e => {
-      console.error('MapLibre import failed:', e)
+      map.on('mousemove', (e: any) => {
+        const { lng, lat } = e.lngLat
+        setMousePos({ lat, lng })
+        if (!drawingRef.current) return
+        const tool = toolRef.current
+
+        if (tool === 'rectangle' && startRef.current) {
+          const [sLng, sLat] = startRef.current
+          setPreview([[sLng, sLat], [lng, sLat], [lng, lat], [sLng, lat], [sLng, sLat]])
+        } else if (tool === 'circle' && startRef.current) {
+          const [cLng, cLat] = startRef.current
+          const r = Math.hypot(lng - cLng, lat - cLat)
+          const ring: number[][] = []
+          for (let i = 0; i <= 64; i++) {
+            const a = (i / 64) * Math.PI * 2
+            ring.push([cLng + r * Math.cos(a), cLat + r * Math.sin(a)])
+          }
+          setPreview(ring)
+        } else if (tool === 'polygon' && pointsRef.current.length > 0) {
+          setPreview([...pointsRef.current, [lng, lat], pointsRef.current[0]])
+        }
+      })
+
+      map.on('zoom', () => setZoom(map.getZoom()))
+      map.on('move', () => {
+        const c = map.getCenter()
+        setCenter([c.lng, c.lat])
+      })
     })
-    return () => { cancelled = true; mapRef.current?.remove() }
+
+    return () => {
+      cancelled = true
+      map?.remove()
+      mapRef.current = null
+    }
   }, [])
 
-  function handleRectangleClick(lng: number, lat: number, map: any) {
-    if (!startRef.current) {
-      startRef.current = [lng, lat]
-      setDrawing(true)
-      setCoordinates([[lng, lat]])
-    } else {
-      const [sLng, sLat] = startRef.current
-      const coords = [[sLng, sLat], [lng, sLat], [lng, lat], [sLng, lat], [sLng, sLat]]
-      drawShape(coords, map, 'rectangle')
-      startRef.current = null
-      setDrawing(false)
-    }
+  function clearLayer(id: string) {
+    const map = mapRef.current
+    if (!map) return
+    try {
+      if (map.getLayer(`${id}-fill`)) map.removeLayer(`${id}-fill`)
+      if (map.getLayer(`${id}-line`)) map.removeLayer(`${id}-line`)
+      if (map.getSource(id)) map.removeSource(id)
+    } catch { /* ignore */ }
   }
 
-  function updateRectanglePreview(lng: number, lat: number, map: any) {
-    if (!startRef.current) return
-    const [sLng, sLat] = startRef.current
-    const coords = [[sLng, sLat], [lng, sLat], [lng, lat], [sLng, lat], [sLng, sLat]]
-    updatePreview(coords, map)
-  }
-
-  function handleCircleClick(lng: number, lat: number, map: any) {
-    if (!startRef.current) {
-      startRef.current = [lng, lat]
-      setDrawing(true)
-      setCoordinates([[lng, lat]])
-    } else {
-      const [cLng, cLat] = startRef.current
-      const dx = lng - cLng, dy = lat - cLat
-      const r = Math.sqrt(dx * dx + dy * dy)
-      const coords: number[][] = []
-      for (let i = 0; i <= 64; i++) {
-        const a = (i / 64) * 2 * Math.PI
-        coords.push([cLng + r * Math.cos(a), cLat + r * Math.sin(a)])
+  function setPreview(ring: number[][]) {
+    const map = mapRef.current
+    if (!map || ring.length < 3) return
+    const data = { type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] } }
+    try {
+      if (map.getSource('preview')) {
+        map.getSource('preview').setData(data)
+      } else {
+        map.addSource('preview', { type: 'geojson', data })
+        map.addLayer({ id: 'preview-fill', type: 'fill', source: 'preview', paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.25 } })
+        map.addLayer({ id: 'preview-line', type: 'line', source: 'preview', paint: { 'line-color': '#60a5fa', 'line-width': 2 } })
       }
-      drawShape(coords, map, 'circle')
-      startRef.current = null
-      setDrawing(false)
-    }
+    } catch { /* ignore */ }
   }
 
-  function updateCirclePreview(lng: number, lat: number, map: any) {
-    if (!startRef.current) return
-    const [cLng, cLat] = startRef.current
-    const dx = lng - cLng, dy = lat - cLat
-    const r = Math.sqrt(dx * dx + dy * dy)
-    const coords: number[][] = []
-    for (let i = 0; i <= 64; i++) {
-      const a = (i / 64) * 2 * Math.PI
-      coords.push([cLng + r * Math.cos(a), cLat + r * Math.sin(a)])
-    }
-    updatePreview(coords, map)
-  }
+  function finishShape(ring: number[][], shape: string) {
+    const map = mapRef.current
+    if (!map) return
 
-  function handlePolygonClick(lng: number, lat: number, map: any) {
-    pointsRef.current.push([lng, lat])
-    setCoordinates([...pointsRef.current])
-    if (pointsRef.current.length >= 2) {
-      updatePreview([...pointsRef.current, pointsRef.current[0]], map)
-    }
-  }
+    clearLayer('preview')
+    clearLayer('final')
 
-  function updatePolygonPreview(lng: number, lat: number, map: any) {
-    if (pointsRef.current.length === 0) return
-    updatePreview([...pointsRef.current, [lng, lat], pointsRef.current[0]], map)
-  }
-
-  function finishPolygon(map: any) {
-    const coords = [...pointsRef.current, pointsRef.current[0]]
-    drawShape(coords, map, 'polygon')
-    pointsRef.current = []
-  }
-
-  function updatePreview(coords: number[][], map: any) {
-    const geojson = { type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] } }
-    if (map.getSource('preview')) {
-      map.getSource('preview').setData(geojson)
-    } else {
-      map.addSource('preview', { type: 'geojson', data: geojson })
-      map.addLayer({ id: 'preview-fill', type: 'fill', source: 'preview', paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.3 } })
-      map.addLayer({ id: 'preview-line', type: 'line', source: 'preview', paint: { 'line-color': '#3b82f6', 'line-width': 2 } })
-    }
-  }
-
-  function drawShape(coords: number[][], map: any, shape: string) {
-    if (map.getSource('preview')) {
-      map.removeLayer('preview-fill'); map.removeLayer('preview-line'); map.removeSource('preview')
-    }
-    if (map.getSource('final')) {
-      map.removeLayer('final-fill'); map.removeLayer('final-line'); map.removeSource('final')
-    }
-    const geojson = { type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] } }
-    map.addSource('final', { type: 'geojson', data: geojson })
-    map.addLayer({ id: 'final-fill', type: 'fill', source: 'final', paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.4 } })
-    map.addLayer({ id: 'final-line', type: 'line', source: 'final', paint: { 'line-color': '#3b82f6', 'line-width': 3 } })
+    const data = { type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] } }
+    try {
+      map.addSource('final', { type: 'geojson', data })
+      map.addLayer({ id: 'final-fill', type: 'fill', source: 'final', paint: { 'fill-color': '#22c55e', 'fill-opacity': 0.35 } })
+      map.addLayer({ id: 'final-line', type: 'line', source: 'final', paint: { 'line-color': '#4ade80', 'line-width': 3 } })
+    } catch { /* ignore */ }
 
     const R = 6378137
     const rad = (d: number) => (d * Math.PI) / 180
     let area = 0
-    for (let i = 0; i < coords.length - 1; i++) {
-      area += rad(coords[i + 1][0] - coords[i][0]) * (2 + Math.sin(rad(coords[i][1])) + Math.sin(rad(coords[i + 1][1])))
+    for (let i = 0; i < ring.length - 1; i++) {
+      area += rad(ring[i + 1][0] - ring[i][0]) * (2 + Math.sin(rad(ring[i][1])) + Math.sin(rad(ring[i + 1][1])))
     }
     const area_ha = Math.round((Math.abs(area * R * R) / 2 / 10000) * 100) / 100
 
     let sumLat = 0, sumLng = 0
-    coords.forEach(([lng, lat]) => { sumLat += lat; sumLng += lng })
-    const center = { lat: sumLat / coords.length, lng: sumLng / coords.length }
+    ring.forEach(([lng, lat]) => { sumLat += lat; sumLng += lng })
+    const n = ring.length
+    const lat = sumLat / n
+    const lng = sumLng / n
 
-    callbacksRef.current.onAreaSelect?.({
-      lat: center.lat,
-      lng: center.lng,
-      area_ha,
-      shape,
-      coordinates: coords
-    })
+    startRef.current = null
+    pointsRef.current = []
+    drawingRef.current = false
+    setIsDrawing(false)
+    setHint(`${shape} drawn — ${area_ha} ha. Analyzing...`)
+
+    cbRef.current.onAreaSelect?.({ lat, lng, area_ha, shape, coordinates: ring })
   }
 
-  const handleZoomIn = () => mapRef.current?.zoomIn()
-  const handleZoomOut = () => mapRef.current?.zoomOut()
-  const handleReset = () => { mapRef.current?.setCenter([78.9629, 20.5937]); mapRef.current?.setZoom(5); }
+  function cancelDraw() {
+    startRef.current = null
+    pointsRef.current = []
+    drawingRef.current = false
+    setIsDrawing(false)
+    clearLayer('preview')
+    setHint('Drawing cancelled. Select a tool and try again.')
+  }
 
-  const scale = Math.round(156543.03392 * Math.cos(center[1] * Math.PI / 180) / Math.pow(2, zoom))
+  const scale = Math.round(156543.03392 * Math.cos((center[1] * Math.PI) / 180) / Math.pow(2, zoom))
+  const tools = [
+    { id: 'select', label: 'Select' },
+    { id: 'rectangle', label: 'Rectangle' },
+    { id: 'circle', label: 'Circle' },
+    { id: 'polygon', label: 'Polygon' },
+  ]
 
   return (
-    <div className="map-workspace">
-      <div ref={container} className="map-container">
-        <div className="map-inner" />
-      </div>
+    <div className="map-workspace" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <div ref={mapDiv} style={{ flex: 1, minHeight: 300, width: '100%', position: 'relative' }} />
 
-      {/* Drawing toolbar */}
+      {!mapReady && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', zIndex: 5 }}>
+          <div className="spinner" />
+          <span style={{ marginLeft: 12, color: 'var(--text-secondary)' }}>Loading map...</span>
+        </div>
+      )}
+
       <div className="drawing-toolbar">
-        <button className={`btn btn-sm ${activeTool === 'select' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => {}}>Select</button>
-        <button className={`btn btn-sm ${activeTool === 'rectangle' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => {}}>Rectangle</button>
-        <button className={`btn btn-sm ${activeTool === 'circle' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => {}}>Circle</button>
-        <button className={`btn btn-sm ${activeTool === 'polygon' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => {}}>Polygon</button>
-        {drawing && <button className="btn btn-sm btn-ghost" onClick={() => { setDrawing(false); startRef.current = null; pointsRef.current = []; }}>Cancel</button>}
+        {tools.map(t => (
+          <button
+            key={t.id}
+            type="button"
+            className={`btn btn-sm ${activeTool === t.id ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => onToolChange(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+        {isDrawing && (
+          <button type="button" className="btn btn-sm btn-ghost" onClick={cancelDraw}>Cancel</button>
+        )}
       </div>
 
-      {/* Map controls */}
+      <div className="map-hint" style={{
+        position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)',
+        background: 'rgba(17,24,39,0.95)', border: '1px solid var(--border)', borderRadius: 20,
+        padding: '8px 16px', fontSize: 12, color: 'var(--text-secondary)', zIndex: 10, whiteSpace: 'nowrap',
+      }}>
+        {hint}
+      </div>
+
       <div className="map-controls">
-        <button className="map-control-btn" onClick={handleZoomIn} title="Zoom In">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </button>
-        <button className="map-control-btn" onClick={handleZoomOut} title="Zoom Out">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </button>
-        <button className="map-control-btn" onClick={handleReset} title="Reset">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-        </button>
-      </div>
-
-      <div className="compass">
-        <span className="compass-n">N</span>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10"/>
-          <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88" fill="currentColor"/>
-        </svg>
+        <button type="button" className="map-control-btn" onClick={() => mapRef.current?.zoomIn()}>+</button>
+        <button type="button" className="map-control-btn" onClick={() => mapRef.current?.zoomOut()}>−</button>
       </div>
 
       <div className="scale-bar">
-        <div className="scale-line"/>
+        <div className="scale-line" />
         <span>{scale < 1000 ? `${scale} m` : `${Math.round(scale / 1000)} km`}</span>
       </div>
 
       {mousePos && (
         <div className="coordinates">
-          <span>Lat: {mousePos.lat.toFixed(6)}°</span>
-          <span>Lon: {mousePos.lng.toFixed(6)}°</span>
+          <span>Lat: {mousePos.lat.toFixed(5)}°</span>
+          <span>Lon: {mousePos.lng.toFixed(5)}°</span>
         </div>
       )}
-
-      <div className="minimap">
-        <div className="minimap-inner" style={{ background: 'linear-gradient(135deg, #1a472a 0%, #2d5016 50%, #1a472a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Overview</div>
-      </div>
     </div>
   )
 }

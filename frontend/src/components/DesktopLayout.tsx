@@ -78,23 +78,57 @@ export default function DesktopLayout() {
     setMessages(prev => [...prev, { timestamp: time, type: 'info', message: `Map clicked: ${lat.toFixed(6)}, ${lng.toFixed(6)}` }])
   }
 
+  const ts = () => new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+
   const handleAreaSelect = async (info: { lat: number; lng: number; area_ha: number; shape: string; coordinates: number[][] }) => {
     setAnalyzing(true)
-    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    setMessages(prev => [...prev, { timestamp: time, type: 'info', message: `Area selected: ${info.shape}, ${info.area_ha} ha` }])
+    setAreaData(null)
+    setMessages(prev => [...prev, { timestamp: ts(), type: 'info', message: `Area selected: ${info.shape}, ${info.area_ha} ha @ ${info.lat.toFixed(4)}, ${info.lng.toFixed(4)}` }])
+    setMessages(prev => [...prev, { timestamp: ts(), type: 'info', message: 'Fetching Sentinel-2, SoilGrids, Open-Meteo...' }])
 
     try {
-      const r = await fetch(`${API}/api/analysis/area?lat=${info.lat}&lng=${info.lng}`, { method: 'POST' })
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 90000)
+      const r = await fetch(`${API}/api/analysis/area?lat=${info.lat}&lng=${info.lng}`, {
+        method: 'POST',
+        signal: controller.signal,
+      })
+      clearTimeout(timer)
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const data = await r.json()
       setAreaData({ ...info, ...data })
-      setMessages(prev => [...prev, { timestamp: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }), type: 'success', message: 'Analysis completed successfully' }])
-    } catch (e) {
-      setMessages(prev => [...prev, { timestamp: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }), type: 'error', message: 'Analysis failed' }])
+      setMessages(prev => [...prev, {
+        timestamp: ts(),
+        type: 'success',
+        message: `Analysis OK — NDVI=${data.vegetation?.ndvi ?? 'n/a'}, Health=${data.health?.score ?? 'n/a'}, pH=${data.soil?.ph ?? 'n/a'}`,
+      }])
+    } catch (e: any) {
+      setAreaData({ ...info, error: e?.message || 'failed' })
+      setMessages(prev => [...prev, { timestamp: ts(), type: 'error', message: `Analysis failed: ${e?.message || e}` }])
     }
     setAnalyzing(false)
   }
 
-  const isMapPage = location.pathname === '/map' || location.pathname === '/'
+  const handleSaveFarm = async () => {
+    if (!areaData) return
+    try {
+      const name = `AOI ${areaData.shape} ${areaData.lat.toFixed(2)},${areaData.lng.toFixed(2)}`
+      const r = await fetch(`${API}/api/farms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, lat: areaData.lat, lng: areaData.lng }),
+      })
+      if (!r.ok) throw new Error('save failed')
+      const d = await fetch(`${API}/api/farms`).then(x => x.json())
+      setFarms(d.farms || [])
+      setMessages(prev => [...prev, { timestamp: ts(), type: 'success', message: `Farm saved: ${name}` }])
+      setAreaData(null)
+    } catch {
+      setMessages(prev => [...prev, { timestamp: ts(), type: 'error', message: 'Failed to save farm' }])
+    }
+  }
+
+  const isMapPage = location.pathname === '/map' || location.pathname === '/' || location.pathname === '/aoi'
 
   return (
     <div className="desktop-app">
@@ -223,6 +257,7 @@ export default function DesktopLayout() {
               onAreaSelect={handleAreaSelect}
               onMapClick={handleMapClick}
               activeTool={activeTool}
+              onToolChange={setActiveTool}
             />
             {analyzing && (
               <div style={{ padding: 16, background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -263,8 +298,8 @@ export default function DesktopLayout() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button className="btn btn-sm btn-ghost" onClick={() => setAreaData(null)}>Dismiss</button>
-                  <button className="btn btn-sm btn-primary">Save as Farm</button>
+                  <button type="button" className="btn btn-sm btn-ghost" onClick={() => setAreaData(null)}>Dismiss</button>
+                  <button type="button" className="btn btn-sm btn-primary" onClick={handleSaveFarm}>Save as Farm</button>
                 </div>
               </div>
             )}
