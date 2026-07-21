@@ -35,6 +35,8 @@ export default function DesktopLayout() {
   const [mousePos, setMousePos] = useState<{ lat: number; lng: number } | undefined>(undefined)
   const [zoom, setZoom] = useState(4.5)
   const [center, setCenter] = useState<[number, number]>([78.9629, 20.5937])
+  const [areaData, setAreaData] = useState<any>(null)
+  const [analyzing, setAnalyzing] = useState(false)
 
   const [messages, setMessages] = useState<ConsoleMessage[]>([
     { timestamp: '10:24:15', type: 'info', message: 'Project loaded successfully' },
@@ -72,6 +74,24 @@ export default function DesktopLayout() {
 
   const handleMapClick = (lat: number, lng: number) => {
     setMousePos({ lat, lng })
+    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    setMessages(prev => [...prev, { timestamp: time, type: 'info', message: `Map clicked: ${lat.toFixed(6)}, ${lng.toFixed(6)}` }])
+  }
+
+  const handleAreaSelect = async (info: { lat: number; lng: number; area_ha: number; shape: string; coordinates: number[][] }) => {
+    setAnalyzing(true)
+    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    setMessages(prev => [...prev, { timestamp: time, type: 'info', message: `Area selected: ${info.shape}, ${info.area_ha} ha` }])
+
+    try {
+      const r = await fetch(`${API}/api/analysis/area?lat=${info.lat}&lng=${info.lng}`, { method: 'POST' })
+      const data = await r.json()
+      setAreaData({ ...info, ...data })
+      setMessages(prev => [...prev, { timestamp: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }), type: 'success', message: 'Analysis completed successfully' }])
+    } catch (e) {
+      setMessages(prev => [...prev, { timestamp: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }), type: 'error', message: 'Analysis failed' }])
+    }
+    setAnalyzing(false)
   }
 
   const isMapPage = location.pathname === '/map' || location.pathname === '/'
@@ -123,9 +143,9 @@ export default function DesktopLayout() {
         </div>
         <div className="toolbar-group">
           <button className="toolbar-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span className="tooltip">Measure</span></button>
-          <button className="toolbar-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg><span className="tooltip">Draw Polygon</span></button>
-          <button className="toolbar-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/></svg><span className="tooltip">Draw Line</span></button>
-          <button className="toolbar-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/></svg><span className="tooltip">Draw Point</span></button>
+          <button className={`toolbar-btn ${activeTool === 'rectangle' ? 'active' : ''}`} onClick={() => setActiveTool('rectangle')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg><span className="tooltip">Rectangle</span></button>
+          <button className={`toolbar-btn ${activeTool === 'circle' ? 'active' : ''}`} onClick={() => setActiveTool('circle')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/></svg><span className="tooltip">Circle</span></button>
+          <button className={`toolbar-btn ${activeTool === 'polygon' ? 'active' : ''}`} onClick={() => setActiveTool('polygon')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/></svg><span className="tooltip">Polygon</span></button>
         </div>
         <div className="toolbar-group">
           <button className="toolbar-btn" onClick={() => navigate('/ai-analysis')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 6v6l4 2"/></svg><span className="tooltip">AI Analysis</span></button>
@@ -198,15 +218,57 @@ export default function DesktopLayout() {
 
         {/* Map Workspace or Page Content */}
         {isMapPage ? (
-          <WorkspaceMap
-            farms={farms}
-            fields={fields}
-            selectedLayer={selectedLayer}
-            onSelectLayer={setSelectedLayer}
-            onMapClick={handleMapClick}
-            onToolChange={setActiveTool}
-            activeTool={activeTool}
-          />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <WorkspaceMap
+              onAreaSelect={handleAreaSelect}
+              onMapClick={handleMapClick}
+              activeTool={activeTool}
+            />
+            {analyzing && (
+              <div style={{ padding: 16, background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="spinner"/>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Analyzing satellite, soil, and weather data...</span>
+              </div>
+            )}
+            {areaData && (
+              <div style={{ padding: 16, background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)', maxHeight: 200, overflow: 'auto' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>NDVI</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: areaData.vegetation?.ndvi >= 0.4 ? 'var(--success)' : 'var(--warning)' }}>
+                      {areaData.vegetation?.ndvi ?? '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>NDMI</div>
+                    <div style={{ fontSize: 18, fontWeight: 700 }}>{areaData.vegetation?.ndmi ?? '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>Health Score</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: areaData.health?.score >= 75 ? 'var(--success)' : 'var(--warning)' }}>
+                      {areaData.health?.score ?? '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>Soil pH</div>
+                    <div style={{ fontSize: 18, fontWeight: 700 }}>{areaData.soil?.ph ?? '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>Moisture</div>
+                    <div style={{ fontSize: 18, fontWeight: 700 }}>{areaData.soil?.moisture ?? '—'}%</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>Area</div>
+                    <div style={{ fontSize: 18, fontWeight: 700 }}>{areaData.area_ha} ha</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button className="btn btn-sm btn-ghost" onClick={() => setAreaData(null)}>Dismiss</button>
+                  <button className="btn btn-sm btn-primary">Save as Farm</button>
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
           <div style={{ flex: 1, overflow: 'auto' }}>
             <Outlet />
