@@ -40,11 +40,9 @@ export default function Dashboard() {
     setAreaLoading(true)
     setAreaData(null)
     try {
-      const [wRes, sRes] = await Promise.all([
-        fetch(`${API}/api/weather?lat=${info.lat}&lon=${info.lng}`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/api/soil?lat=${info.lat}&lon=${info.lng}`).then(r => r.json()).catch(() => null),
-      ])
-      setAreaData({ ...info, weather: wRes?.current, soil: sRes })
+      const r = await fetch(`${API}/api/analysis/area?lat=${info.lat}&lng=${info.lng}`, { method: 'POST' })
+      const data = await r.json()
+      setAreaData({ ...info, ...data })
     } catch (e) { console.error(e) }
     setAreaLoading(false)
   }
@@ -79,16 +77,76 @@ export default function Dashboard() {
         <div style={{ marginBottom: 24, padding: 20, background: '#111827', border: '1px solid #00d4aa', borderRadius: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, color: '#00d4aa' }}>📐 {areaData.shape} — {areaData.area_ha} ha</h3>
-            <span style={{ color: '#64748b', fontSize: 13 }}>{areaData.lat.toFixed(4)}, {areaData.lng.toFixed(4)}</span>
+            <span style={{ color: '#64748b', fontSize: 13 }}>{areaData.lat?.toFixed(4)}, {areaData.lng?.toFixed(4)}</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-            <div style={{ padding: 12, background: '#0a0f1a', borderRadius: 8 }}><div style={{ color: '#64748b', fontSize: 12 }}>Temp</div><div style={{ fontSize: 22, fontWeight: 700 }}>{areaData.weather?.temperature_2m ?? '—'}°C</div></div>
-            <div style={{ padding: 12, background: '#0a0f1a', borderRadius: 8 }}><div style={{ color: '#64748b', fontSize: 12 }}>Humidity</div><div style={{ fontSize: 22, fontWeight: 700 }}>{areaData.weather?.relative_humidity_2m ?? '—'}%</div></div>
-            <div style={{ padding: 12, background: '#0a0f1a', borderRadius: 8 }}><div style={{ color: '#64748b', fontSize: 12 }}>Soil pH</div><div style={{ fontSize: 22, fontWeight: 700 }}>{areaData.soil?.ph ?? '—'}</div></div>
-            <div style={{ padding: 12, background: '#0a0f1a', borderRadius: 8 }}><div style={{ color: '#64748b', fontSize: 12 }}>Carbon</div><div style={{ fontSize: 22, fontWeight: 700 }}>{areaData.soil?.soc ? areaData.soil.soc + '%' : '—'}</div></div>
+
+          {/* Health Score Bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+            <div style={{ fontSize: 36, fontWeight: 700, color: areaData.health?.score >= 75 ? '#00d4aa' : areaData.health?.score >= 50 ? '#f59e0b' : '#ef4444' }}>
+              {areaData.health?.score ?? '—'}
+            </div>
+            <div>
+              <div style={{ fontWeight: 600, color: '#f1f5f9' }}>{areaData.health?.label || 'No Data'}</div>
+              <div style={{ height: 8, background: '#1e293b', borderRadius: 4, width: 200, marginTop: 4 }}>
+                <div style={{ width: `${areaData.health?.score || 0}%`, height: '100%', background: areaData.health?.score >= 75 ? '#00d4aa' : areaData.health?.score >= 50 ? '#f59e0b' : '#ef4444', borderRadius: 4 }} />
+              </div>
+            </div>
+            <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: '#f59e0b' }}>{areaData.yield_potential?.estimated_tons_ha ?? '—'} t/ha</div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>{areaData.yield_potential?.rating}</div>
+            </div>
           </div>
+
+          {/* Metrics Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
+            <div style={{ padding: 12, background: '#0a0f1a', borderRadius: 8 }}>
+              <div style={{ color: '#64748b', fontSize: 11 }}>NDVI</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: areaData.vegetation?.ndvi >= 0.4 ? '#00d4aa' : areaData.vegetation?.ndvi >= 0.2 ? '#f59e0b' : '#ef4444' }}>{areaData.vegetation?.ndvi ?? '—'}</div>
+            </div>
+            <div style={{ padding: 12, background: '#0a0f1a', borderRadius: 8 }}>
+              <div style={{ color: '#64748b', fontSize: 11 }}>NDMI</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#3b82f6' }}>{areaData.vegetation?.ndmi ?? '—'}</div>
+            </div>
+            <div style={{ padding: 12, background: '#0a0f1a', borderRadius: 8 }}>
+              <div style={{ color: '#64748b', fontSize: 11 }}>Soil pH</div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{areaData.soil?.ph ?? '—'}</div>
+            </div>
+            <div style={{ padding: 12, background: '#0a0f1a', borderRadius: 8 }}>
+              <div style={{ color: '#64748b', fontSize: 11 }}>Moisture</div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{areaData.soil?.moisture ?? '—'}%</div>
+            </div>
+            <div style={{ padding: 12, background: '#0a0f1a', borderRadius: 8 }}>
+              <div style={{ color: '#64748b', fontSize: 11 }}>Temp</div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{areaData.weather?.temp ?? '—'}°C</div>
+            </div>
+            <div style={{ padding: 12, background: '#0a0f1a', borderRadius: 8 }}>
+              <div style={{ color: '#64748b', fontSize: 11 }}>Irrigation</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#3b82f6' }}>{areaData.irrigation?.need_mm ?? 0}mm</div>
+            </div>
+          </div>
+
+          {/* Soil Details */}
+          {areaData.soil?.organic_carbon && (
+            <div style={{ marginTop: 12, display: 'flex', gap: 16, fontSize: 13, color: '#94a3b8' }}>
+              <span>Carbon: {areaData.soil.organic_carbon}%</span>
+              <span>Clay: {areaData.soil.clay}%</span>
+              <span>Sand: {areaData.soil.sand}%</span>
+              <span>Nitrogen: {areaData.soil.nitrogen}%</span>
+            </div>
+          )}
+
+          {/* Alerts */}
+          {areaData.health?.alerts?.length > 0 && (
+            <div style={{ marginTop: 12, padding: 10, background: 'rgba(239,68,68,0.1)', borderRadius: 8, borderLeft: '3px solid #ef4444' }}>
+              {areaData.health.alerts.map((a: any, i: number) => (
+                <div key={i} style={{ fontSize: 13, color: '#ef4444' }}>⚠ {a.message}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Actions */}
           <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-            <button onClick={async () => { setCreating(true); try { const r = await fetch(`${API}/api/farms`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `Area @${areaData.lat.toFixed(2)},${areaData.lng.toFixed(2)}`, lat: areaData.lat, lng: areaData.lng }) }); if (r.ok) { await fetchFarms(); setAreaData(null) } } catch (e) {} setCreating(false) }} style={{ padding: '8px 16px', background: '#00d4aa', color: '#0a0f1a', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>Save as Farm</button>
+            <button onClick={async () => { setCreating(true); try { const r = await fetch(`${API}/api/farms`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `Area @${areaData.lat?.toFixed(2)},${areaData.lng?.toFixed(2)}`, lat: areaData.lat, lng: areaData.lng }) }); if (r.ok) { await fetchFarms(); setAreaData(null) } } catch (e) {} setCreating(false) }} style={{ padding: '8px 16px', background: '#00d4aa', color: '#0a0f1a', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>Save as Farm</button>
             <button onClick={() => setAreaData(null)} style={{ padding: '8px 16px', background: 'transparent', color: '#94a3b8', border: '1px solid #1e293b', borderRadius: 8, cursor: 'pointer' }}>Dismiss</button>
           </div>
         </div>
