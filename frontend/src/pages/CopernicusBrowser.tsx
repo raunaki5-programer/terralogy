@@ -21,7 +21,7 @@ export default function CopernicusBrowser() {
     return d.toISOString().slice(0, 10)
   })
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10))
-  const [maxCloud, setMaxCloud] = useState('60')
+  const [maxCloud, setMaxCloud] = useState('95')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [products, setProducts] = useState<Product[]>([])

@@ -28,7 +28,7 @@ async def catalog(
     north: float = Query(...),
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    max_cloud: float = 60,
+    max_cloud: float = 95,
     limit: int = 20,
 ):
     """Browse Copernicus Sentinel-2 catalog for a bounding box."""

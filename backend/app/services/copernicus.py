@@ -226,7 +226,7 @@ async def fetch_true_color(bbox, token, width=512, height=512):
     payload = {
         "input": {
             "bounds": {"bbox": bbox, "properties": {"crs": "http://www.opengis.net/def/crs/EPSG/0/4326"}},
-            "data": [{"type": "sentinel-2-l2a", "dataFilter": {"mosaickingOrder": "leastCC", "maxCloudCoverage": 50}}],
+            "data": [{"type": "sentinel-2-l2a", "dataFilter": {"mosaickingOrder": "leastCC", "maxCloudCoverage": 95}}],
         },
         "output": {
             "width": min(width, 1024),
@@ -261,7 +261,7 @@ async def fetch_ndvi_image(bbox, token, width=512, height=512):
     payload = {
         "input": {
             "bounds": {"bbox": bbox, "properties": {"crs": "http://www.opengis.net/def/crs/EPSG/0/4326"}},
-            "data": [{"type": "sentinel-2-l2a", "dataFilter": {"mosaickingOrder": "leastCC", "maxCloudCoverage": 50}}],
+            "data": [{"type": "sentinel-2-l2a", "dataFilter": {"mosaickingOrder": "leastCC", "maxCloudCoverage": 95}}],
         },
         "output": {
             "width": min(width, 1024),
