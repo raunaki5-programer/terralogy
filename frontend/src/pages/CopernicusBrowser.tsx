@@ -53,13 +53,20 @@ export default function CopernicusBrowser() {
 
   const updateBboxRef = () => { bboxRef.current = bbox() }
 
+  const clearAll = () => {
+    setTrueColor(null)
+    setNdviImage(null)
+    setIndices(null)
+    setProducts([])
+    setError('')
+  }
+
   const searchCatalog = async () => {
     setLoading(true)
     setError('')
-    setProducts([])
     updateBboxRef()
+    const b = bboxRef.current
     try {
-      const b = bboxRef.current
       const q = new URLSearchParams({
         west: String(b.west), south: String(b.south), east: String(b.east), north: String(b.north),
         date_from: dateFrom, date_to: dateTo, max_cloud: maxCloud, limit: '25',
@@ -78,10 +85,7 @@ export default function CopernicusBrowser() {
 
   const loadImagery = async () => {
     setLoading(true)
-    setError('')
-    setTrueColor(null)
-    setNdviImage(null)
-    setIndices(null)
+    clearAll()
     updateBboxRef()
     try {
       const b = bboxRef.current
@@ -91,8 +95,9 @@ export default function CopernicusBrowser() {
         fetch(`${API}/api/satellite/indices?bbox=${b.str}`).then(r => r.json()),
       ])
       if (tc.data_url) setTrueColor(tc.data_url)
-      else if (tc.status === 'error') setError(`True color: ${tc.detail || tc.code}`)
+      if (tc.status === 'error') setError(`True color: ${tc.detail || tc.code}`)
       if (nd.data_url) setNdviImage(nd.data_url)
+      if (nd.status === 'error') setError(`NDVI: ${nd.detail || nd.code}`)
       setIndices(idx)
     } catch (e: any) {
       setError(e.message || 'Imagery load failed')
@@ -102,7 +107,7 @@ export default function CopernicusBrowser() {
 
   const fullBrowse = async () => {
     setLoading(true)
-    setError('')
+    clearAll()
     updateBboxRef()
     try {
       const q = new URLSearchParams({
