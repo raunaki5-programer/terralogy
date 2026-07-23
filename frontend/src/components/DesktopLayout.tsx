@@ -309,7 +309,7 @@ export default function DesktopLayout() {
         )}
 
         {/* Properties Panel */}
-        <PropertiesPanel selectedLayer={selectedLayer} />
+        <PropertiesPanel selectedLayer={selectedLayer} areaData={areaData} />
       </div>
 
       {/* Bottom Panel */}

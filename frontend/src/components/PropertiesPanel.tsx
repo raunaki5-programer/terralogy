@@ -12,14 +12,15 @@ interface Layer {
 
 interface PropertiesPanelProps {
   selectedLayer: Layer | null
+  areaData?: any
 }
 
-export default function PropertiesPanel({ selectedLayer }: PropertiesPanelProps) {
-  const [activeTab, setActiveTab] = useState('visualization')
+export default function PropertiesPanel({ selectedLayer, areaData }: PropertiesPanelProps) {
+  const [activeTab, setActiveTab] = useState('info')
   const [opacity, setOpacity] = useState(selectedLayer?.opacity || 100)
-  const [bandCombination, setBandCombination] = useState('False Color (NIR - SWIR - Red)')
+  const [bandCombination, setBandCombination] = useState('True Color (Red - Green - Blue)')
 
-  const tabs = ['Visualization', 'Info', 'Band View', 'Metadata']
+  const tabs = ['Info', 'Visualization', 'Band View', 'Metadata']
 
   return (
     <div className="panel panel-right">
@@ -41,6 +42,146 @@ export default function PropertiesPanel({ selectedLayer }: PropertiesPanelProps)
       </div>
 
       <div className="panel-content">
+        {activeTab === 'info' && (
+          <>
+            {areaData && !areaData.error ? (
+              <>
+                <div className="props-section">
+                  <div className="props-label">Location</div>
+                  <div className="props-row">
+                    <span className="props-row-label">Latitude</span>
+                    <span className="props-row-value">{areaData.location?.lat?.toFixed(5) ?? areaData.lat?.toFixed(5) ?? '—'}</span>
+                  </div>
+                  <div className="props-row">
+                    <span className="props-row-label">Longitude</span>
+                    <span className="props-row-value">{areaData.location?.lng?.toFixed(5) ?? areaData.lng?.toFixed(5) ?? '—'}</span>
+                  </div>
+                  <div className="props-row">
+                    <span className="props-row-label">Area</span>
+                    <span className="props-row-value">{areaData.area_ha} ha</span>
+                  </div>
+                  <div className="props-row">
+                    <span className="props-row-label">Shape</span>
+                    <span className="props-row-value">{areaData.shape || '—'}</span>
+                  </div>
+                </div>
+
+                {areaData.vegetation && (
+                  <div className="props-section">
+                    <div className="props-label">Vegetation</div>
+                    <div className="props-row">
+                      <span className="props-row-label">NDVI</span>
+                      <span className="props-row-value" style={{ color: (areaData.vegetation.ndvi ?? 0) >= 0.4 ? 'var(--success)' : 'var(--warning)' }}>
+                        {areaData.vegetation.ndvi ?? '—'}
+                      </span>
+                    </div>
+                    <div className="props-row">
+                      <span className="props-row-label">NDMI</span>
+                      <span className="props-row-value">{areaData.vegetation.ndmi ?? '—'}</span>
+                    </div>
+                  </div>
+                )}
+
+                {areaData.health && (
+                  <div className="props-section">
+                    <div className="props-label">Health</div>
+                    <div className="props-row">
+                      <span className="props-row-label">Score</span>
+                      <span className="props-row-value" style={{ color: (areaData.health.score ?? 0) >= 75 ? 'var(--success)' : 'var(--warning)' }}>
+                        {areaData.health.score ?? '—'}
+                      </span>
+                    </div>
+                    <div className="props-row">
+                      <span className="props-row-label">Status</span>
+                      <span className="props-row-value">{areaData.health.label ?? '—'}</span>
+                    </div>
+                  </div>
+                )}
+
+                {areaData.soil && (
+                  <div className="props-section">
+                    <div className="props-label">Soil</div>
+                    <div className="props-row">
+                      <span className="props-row-label">pH</span>
+                      <span className="props-row-value">{areaData.soil.ph ?? '—'}</span>
+                    </div>
+                    <div className="props-row">
+                      <span className="props-row-label">Moisture</span>
+                      <span className="props-row-value">{areaData.soil.moisture ?? '—'}%</span>
+                    </div>
+                    {areaData.soil.clay && (
+                      <div className="props-row">
+                        <span className="props-row-label">Clay</span>
+                        <span className="props-row-value">{areaData.soil.clay}%</span>
+                      </div>
+                    )}
+                    {areaData.soil.organic_carbon && (
+                      <div className="props-row">
+                        <span className="props-row-label">Organic Carbon</span>
+                        <span className="props-row-value">{areaData.soil.organic_carbon}%</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {areaData.weather?.temp && (
+                  <div className="props-section">
+                    <div className="props-label">Weather</div>
+                    <div className="props-row">
+                      <span className="props-row-label">Temperature</span>
+                      <span className="props-row-value">{areaData.weather.temp}°C</span>
+                    </div>
+                    <div className="props-row">
+                      <span className="props-row-label">Humidity</span>
+                      <span className="props-row-value">{areaData.weather.humidity}%</span>
+                    </div>
+                  </div>
+                )}
+
+                {areaData.yield_potential && (
+                  <div className="props-section">
+                    <div className="props-label">Yield Potential</div>
+                    <div className="props-row">
+                      <span className="props-row-label">Estimate</span>
+                      <span className="props-row-value">{areaData.yield_potential.estimated_tons_ha ?? '—'} t/ha</span>
+                    </div>
+                    <div className="props-row">
+                      <span className="props-row-label">Rating</span>
+                      <span className="props-row-value">{areaData.yield_potential.rating ?? '—'}</span>
+                    </div>
+                  </div>
+                )}
+
+                {areaData.irrigation && (
+                  <div className="props-section">
+                    <div className="props-label">Irrigation</div>
+                    <div className="props-row">
+                      <span className="props-row-label">Need</span>
+                      <span className="props-row-value">{areaData.irrigation.need_mm ?? '—'} mm</span>
+                    </div>
+                    <div className="props-row">
+                      <span className="props-row-label">Urgency</span>
+                      <span className="props-row-value">{areaData.irrigation.urgency ?? '—'}</span>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : areaData?.error ? (
+              <div className="props-section">
+                <div className="props-label">Error</div>
+                <div style={{ fontSize: 12, color: 'var(--danger)' }}>{areaData.error}</div>
+              </div>
+            ) : (
+              <div className="props-section">
+                <div className="props-label">No Data</div>
+                <div className="props-row"><span className="props-row-label">Draw an area on the map</span></div>
+                <div className="props-row"><span className="props-row-label">or select a layer</span></div>
+                <div className="props-row"><span className="props-row-label">to view properties</span></div>
+              </div>
+            )}
+          </>
+        )}
+
         {activeTab === 'visualization' && (
           <>
             <div className="props-section">
@@ -93,18 +234,7 @@ export default function PropertiesPanel({ selectedLayer }: PropertiesPanelProps)
             </div>
 
             <div className="props-section">
-              <div className="props-label">AI Quick Analysis</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                {['LULC Classification', 'Change Detection', 'NDVI', 'NDWI', 'Bare Soil', 'Built-up Area'].map(item => (
-                  <button key={item} className="btn btn-sm" style={{ fontSize: 10, padding: '6px 4px' }}>
-                    {item}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="props-section">
-              <div className="props-label">Layer Legend</div>
+              <div className="props-label">Legend</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {[
                   { name: 'Water', color: '#3b82f6' },
@@ -114,66 +244,12 @@ export default function PropertiesPanel({ selectedLayer }: PropertiesPanelProps)
                   { name: 'Bare Soil', color: '#8b5a3c' },
                 ].map(item => (
                   <div key={item.name} className="props-row">
-                    <div className="flex items-center gap-2">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ width: 12, height: 12, background: item.color, borderRadius: 2 }}/>
                       <span className="props-row-label">{item.name}</span>
                     </div>
-                    <button className="layer-action-btn" style={{ opacity: 1 }}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 10, height: 10 }}>
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-                      </svg>
-                    </button>
                   </div>
                 ))}
-              </div>
-            </div>
-
-            <div className="props-section">
-              <div className="props-label">Statistics</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
-                <span className="props-row-label">Overall Accuracy</span>
-                <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--success)' }}>92.34%</span>
-              </div>
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: '92.34%' }}/>
-              </div>
-              <div style={{ marginTop: 12 }}>
-                <div className="props-row">
-                  <span className="props-row-label">Kappa Coefficient</span>
-                  <span className="props-row-value">0.89</span>
-                </div>
-                <div className="props-row">
-                  <span className="props-row-label">Resolution</span>
-                  <span className="props-row-value">10m/px</span>
-                </div>
-                <div className="props-row">
-                  <span className="props-row-label">Area</span>
-                  <span className="props-row-value">2,847 km²</span>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {activeTab === 'info' && (
-          <>
-            <div className="props-section">
-              <div className="props-label">Feature Information</div>
-              <div className="props-row">
-                <span className="props-row-label">Name</span>
-                <span className="props-row-value">{selectedLayer?.name || 'N/A'}</span>
-              </div>
-              <div className="props-row">
-                <span className="props-row-label">Type</span>
-                <span className="props-row-value">{selectedLayer?.type || 'N/A'}</span>
-              </div>
-              <div className="props-row">
-                <span className="props-row-label">CRS</span>
-                <span className="props-row-value">EPSG:4326</span>
-              </div>
-              <div className="props-row">
-                <span className="props-row-label">Extent</span>
-                <span className="props-row-value">77.2, 28.6</span>
               </div>
             </div>
           </>
@@ -201,7 +277,7 @@ export default function PropertiesPanel({ selectedLayer }: PropertiesPanelProps)
               <div className="props-label">Metadata</div>
               <div className="props-row">
                 <span className="props-row-label">Acquisition Date</span>
-                <span className="props-row-value">2024-05-20</span>
+                <span className="props-row-value">{areaData?.date || '—'}</span>
               </div>
               <div className="props-row">
                 <span className="props-row-label">Sensor</span>
@@ -209,7 +285,7 @@ export default function PropertiesPanel({ selectedLayer }: PropertiesPanelProps)
               </div>
               <div className="props-row">
                 <span className="props-row-label">Cloud Cover</span>
-                <span className="props-row-value">3.2%</span>
+                <span className="props-row-value">{areaData?.cloud_cover != null ? `${areaData.cloud_cover}%` : '—'}</span>
               </div>
               <div className="props-row">
                 <span className="props-row-label">Processing Level</span>
