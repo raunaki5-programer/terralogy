@@ -231,13 +231,13 @@ async def fetch_true_color(bbox, token, width=512, height=512):
         "output": {
             "width": min(width, 1024),
             "height": min(height, 1024),
-            "responses": [{"identifier": "default", "format": {"type": "image/jpeg"}}],
+            "responses": [{"identifier": "default", "format": {"type": "image/png"}}],
         },
         "evalscript": """
 //VERSION=3
-function setup() { return { input: ["B04","B03","B02"], output: { bands: 3 } }; }
+function setup() { return { input: ["B04","B03","B02","dataMask"], output: { bands: 4 } }; }
 function evaluatePixel(s) {
-  return [Math.min(1, s.B04 * 2.5), Math.min(1, s.B03 * 2.5), Math.min(1, s.B02 * 2.5)];
+  return [Math.min(1, s.B04 * 2.5), Math.min(1, s.B03 * 2.5), Math.min(1, s.B02 * 2.5), s.dataMask];
 }
 """,
     }
@@ -247,9 +247,9 @@ function evaluatePixel(s) {
             b64 = base64.b64encode(r.content).decode("ascii")
             return {
                 "status": "ok",
-                "content_type": "image/jpeg",
+                "content_type": "image/png",
                 "image_b64": b64,
-                "data_url": f"data:image/jpeg;base64,{b64}",
+                "data_url": f"data:image/png;base64,{b64}",
                 "bbox": bbox,
             }
         return {"status": "error", "detail": r.text[:300], "code": r.status_code}
@@ -266,18 +266,21 @@ async def fetch_ndvi_image(bbox, token, width=512, height=512):
         "output": {
             "width": min(width, 1024),
             "height": min(height, 1024),
-            "responses": [{"identifier": "default", "format": {"type": "image/jpeg"}}],
+            "responses": [{"identifier": "default", "format": {"type": "image/png"}}],
         },
         "evalscript": """
 //VERSION=3
-function setup() { return { input: ["B04","B08"], output: { bands: 3 } }; }
+function setup() { return { input: ["B04","B08","dataMask"], output: { bands: 4 } }; }
 function evaluatePixel(s) {
+  if (s.dataMask === 0) return [0, 0, 0, 0];
   let ndvi = (s.B08 - s.B04) / (s.B08 + s.B04 + 0.001);
-  if (ndvi < 0) return [0.1, 0.1, 0.5];
-  if (ndvi < 0.2) return [0.8, 0.4, 0.1];
-  if (ndvi < 0.4) return [0.9, 0.9, 0.2];
-  if (ndvi < 0.6) return [0.3, 0.8, 0.2];
-  return [0.0, 0.5, 0.1];
+  let r, g, b;
+  if (ndvi < 0) { r=0.1; g=0.1; b=0.5; }
+  else if (ndvi < 0.2) { r=0.8; g=0.4; b=0.1; }
+  else if (ndvi < 0.4) { r=0.9; g=0.9; b=0.2; }
+  else if (ndvi < 0.6) { r=0.3; g=0.8; b=0.2; }
+  else { r=0.0; g=0.5; b=0.1; }
+  return [r, g, b, 1];
 }
 """,
     }
@@ -287,9 +290,9 @@ function evaluatePixel(s) {
             b64 = base64.b64encode(r.content).decode("ascii")
             return {
                 "status": "ok",
-                "content_type": "image/jpeg",
+                "content_type": "image/png",
                 "image_b64": b64,
-                "data_url": f"data:image/jpeg;base64,{b64}",
+                "data_url": f"data:image/png;base64,{b64}",
                 "bbox": bbox,
             }
         return {"status": "error", "detail": r.text[:300], "code": r.status_code}
