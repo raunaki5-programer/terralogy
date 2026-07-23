@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { GOOGLE_MAPS_KEY, GOOGLE_MAPS_SESSION_URL, GOOGLE_TILE_URL, SESSION_MAP_TYPES, BASEMAP_LABELS, type BasemapId } from '@/config'
 
 interface Props {
   onAreaSelect?: (info: { lat: number; lng: number; area_ha: number; shape: string; coordinates: number[][] }) => void
@@ -22,6 +23,9 @@ export default function WorkspaceMap({ onAreaSelect, onMapClick, activeTool, onT
   const [hint, setHint] = useState('Select a draw tool, then click on the map')
   const [isDrawing, setIsDrawing] = useState(false)
   const [mapReady, setMapReady] = useState(false)
+  const [basemap, setBasemap] = useState<BasemapId>('esri-satellite')
+  const sessionRef = useRef<string | null>(null)
+  const [showBasemapPicker, setShowBasemapPicker] = useState(false)
 
   useEffect(() => {
     toolRef.current = activeTool
@@ -63,7 +67,7 @@ export default function WorkspaceMap({ onAreaSelect, onMapClick, activeTool, onT
         style: {
           version: 8,
           sources: {
-            esri: {
+            basemap: {
               type: 'raster',
               tiles: ['https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
               tileSize: 256,
@@ -71,7 +75,7 @@ export default function WorkspaceMap({ onAreaSelect, onMapClick, activeTool, onT
               maxzoom: 19,
             },
           },
-          layers: [{ id: 'satellite', type: 'raster', source: 'esri' }],
+          layers: [{ id: 'basemap-layer', type: 'raster', source: 'basemap' }],
         },
         center: [78.9629, 20.5937],
         zoom: 5,
@@ -259,6 +263,65 @@ export default function WorkspaceMap({ onAreaSelect, onMapClick, activeTool, onT
     setHint('Drawing cancelled. Select a tool and try again.')
   }
 
+  const changeBasemap = useCallback(async (id: BasemapId) => {
+    const map = mapRef.current
+    if (!map) return
+    setBasemap(id)
+    setShowBasemapPicker(false)
+
+    if (id === 'esri-satellite') {
+      if (map.getSource('basemap')) {
+        map.removeLayer('basemap-layer')
+        map.removeSource('basemap')
+      }
+      map.addSource('basemap', {
+        type: 'raster',
+        tiles: ['https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        attribution: 'Esri',
+        maxzoom: 19,
+      })
+      map.addLayer({ id: 'basemap-layer', type: 'raster', source: 'basemap' })
+      return
+    }
+
+    const mapType = SESSION_MAP_TYPES[id]
+    if (!mapType) return
+
+    try {
+      const res = await fetch(`${GOOGLE_MAPS_SESSION_URL}?key=${GOOGLE_MAPS_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mapType, language: 'en-US', region: 'US' }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      sessionRef.current = data.session
+
+      if (map.getSource('basemap')) {
+        map.removeLayer('basemap-layer')
+        map.removeSource('basemap')
+      }
+      map.addSource('basemap', {
+        type: 'raster',
+        tiles: [`${GOOGLE_TILE_URL}/{z}/{x}/{y}?session=${data.session}&key=${GOOGLE_MAPS_KEY}`],
+        tileSize: 256,
+        attribution: 'Google',
+        maxzoom: 20,
+      })
+      map.addLayer({ id: 'basemap-layer', type: 'raster', source: 'basemap' })
+    } catch {
+      setHint(`Failed to load ${BASEMAP_LABELS[id]}, using current basemap`)
+    }
+  }, [])
+
+  const BASEMAP_ICONS: Record<BasemapId, string> = {
+    'esri-satellite': '🗺',
+    'google-satellite': '🛰',
+    'google-hybrid': '🌍',
+    'google-roadmap': '🗾',
+  }
+
   const scale = Math.round(156543.03392 * Math.cos((center[1] * Math.PI) / 180) / Math.pow(2, zoom))
   const tools = [
     { id: 'select', label: 'Select' },
@@ -303,6 +366,28 @@ export default function WorkspaceMap({ onAreaSelect, onMapClick, activeTool, onT
       </div>
 
       <div className="map-controls">
+        <div style={{ position: 'relative' }}>
+          <button type="button" className="map-control-btn" onClick={() => setShowBasemapPicker(p => !p)} style={{ fontSize: 16 }} title="Switch basemap">
+            {BASEMAP_ICONS[basemap]}
+          </button>
+          {showBasemapPicker && (
+            <div style={{
+              position: 'absolute', left: 44, top: 0, background: 'var(--bg-secondary)',
+              border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+              padding: 4, zIndex: 20, display: 'flex', flexDirection: 'column', gap: 2, whiteSpace: 'nowrap',
+            }}>
+              {(Object.keys(BASEMAP_LABELS) as BasemapId[]).map(id => (
+                <button key={id} type="button"
+                  className={`btn btn-sm ${basemap === id ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => changeBasemap(id)}
+                  style={{ textAlign: 'left', justifyContent: 'flex-start' }}
+                >
+                  {BASEMAP_ICONS[id]} {BASEMAP_LABELS[id]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button type="button" className="map-control-btn" onClick={() => mapRef.current?.zoomIn()}>+</button>
         <button type="button" className="map-control-btn" onClick={() => mapRef.current?.zoomOut()}>−</button>
       </div>

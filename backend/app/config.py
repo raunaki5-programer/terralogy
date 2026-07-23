@@ -11,7 +11,10 @@ class Settings:
     copernicus_password: str = os.getenv("COPERNICUS_PASSWORD", "")
     copernicus_client_id: str = os.getenv("COPERNICUS_CLIENT_ID", "cdse-public")
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
-    cors_origins: str = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+    cors_origins: str = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,https://terralogy-frontend.onrender.com,https://terralogy-api-v2.onrender.com",
+    )
     jwt_secret: str = os.getenv("JWT_SECRET", "terralogy-secret-change-in-production")
 
 settings = Settings()

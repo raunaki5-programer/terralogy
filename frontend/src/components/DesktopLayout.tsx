@@ -5,7 +5,7 @@ import PropertiesPanel from './PropertiesPanel'
 import BottomPanel from './BottomPanel'
 import StatusBar from './StatusBar'
 import WorkspaceMap from './WorkspaceMap'
-import type { Farm, Field } from '@/types'
+import type { Farm } from '@/types'
 
 interface Layer {
   id: string
@@ -29,7 +29,6 @@ export default function DesktopLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [farms, setFarms] = useState<Farm[]>([])
-  const [fields, setFields] = useState<Field[]>([])
   const [selectedLayer, setSelectedLayer] = useState<Layer | null>(null)
   const [activeTool, setActiveTool] = useState('select')
   const [mousePos, setMousePos] = useState<{ lat: number; lng: number } | undefined>(undefined)
@@ -46,7 +45,6 @@ export default function DesktopLayout() {
 
   useEffect(() => {
     fetch(`${API}/api/farms`).then(r => r.json()).then(d => setFarms(d.farms || [])).catch(() => {})
-    fetch(`${API}/api/fields`).then(r => r.json()).then(d => setFields(d.fields || [])).catch(() => {})
   }, [])
 
   const folders = [
@@ -196,7 +194,7 @@ export default function DesktopLayout() {
       <div className="workspace">
         {/* Left Sidebar Navigation */}
         <div className="sidebar-nav">
-          <button className={`nav-item ${location.pathname === '/' || location.pathname === '/dashboard' ? 'active' : ''}`} onClick={() => navigate('/')}>
+          <button className={`nav-item ${location.pathname === '/dashboard' ? 'active' : ''}`} onClick={() => navigate('/dashboard')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
             <span className="nav-tooltip">Dashboard</span>
           </button>
@@ -210,7 +208,7 @@ export default function DesktopLayout() {
           </button>
           <button className={`nav-item ${location.pathname === '/satellite' ? 'active' : ''}`} onClick={() => navigate('/satellite')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            <span className="nav-tooltip">Satellite Data</span>
+            <span className="nav-tooltip">Copernicus</span>
           </button>
           <button className={`nav-item ${location.pathname === '/layers' ? 'active' : ''}`} onClick={() => navigate('/layers')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
