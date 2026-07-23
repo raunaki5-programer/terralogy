@@ -220,7 +220,7 @@ export default function CopernicusBrowser() {
           <div className="card-header"><div className="card-title">True Color (Sentinel-2)</div></div>
           <div className="card-body" style={{ minHeight: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {trueColor ? (
-              <img src={trueColor} alt="True color" style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 6 }} />
+              <img key={trueColor} src={trueColor} alt="True color" style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 6 }} />
             ) : (
               <span className="text-muted">Load imagery to preview true color</span>
             )}
@@ -230,7 +230,7 @@ export default function CopernicusBrowser() {
           <div className="card-header"><div className="card-title">NDVI False Color</div></div>
           <div className="card-body" style={{ minHeight: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {ndviImage ? (
-              <img src={ndviImage} alt="NDVI" style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 6 }} />
+              <img key={ndviImage} src={ndviImage} alt="NDVI" style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 6 }} />
             ) : (
               <span className="text-muted">Load imagery to preview NDVI</span>
             )}
