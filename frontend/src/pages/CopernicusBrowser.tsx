@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { API } from '@/lib/api'
 
 interface Product {
@@ -31,6 +31,7 @@ export default function CopernicusBrowser() {
   const [indices, setIndices] = useState<any>(null)
   const [selected, setSelected] = useState<Product | null>(null)
   const [authStatus, setAuthStatus] = useState<string>('')
+  const bboxRef = useRef({ west: 0, south: 0, east: 0, north: 0, str: '' })
 
   const bbox = () => {
     const la = parseFloat(lat), ln = parseFloat(lng), d = parseFloat(delta)
@@ -50,12 +51,15 @@ export default function CopernicusBrowser() {
     }
   }
 
+  const updateBboxRef = () => { bboxRef.current = bbox() }
+
   const searchCatalog = async () => {
     setLoading(true)
     setError('')
     setProducts([])
+    updateBboxRef()
     try {
-      const b = bbox()
+      const b = bboxRef.current
       const q = new URLSearchParams({
         west: String(b.west), south: String(b.south), east: String(b.east), north: String(b.north),
         date_from: dateFrom, date_to: dateTo, max_cloud: maxCloud, limit: '25',
@@ -78,8 +82,9 @@ export default function CopernicusBrowser() {
     setTrueColor(null)
     setNdviImage(null)
     setIndices(null)
+    updateBboxRef()
     try {
-      const b = bbox()
+      const b = bboxRef.current
       const [tc, nd, idx] = await Promise.all([
         fetch(`${API}/api/satellite/true-color?bbox=${b.str}&width=512&height=512`).then(r => r.json()),
         fetch(`${API}/api/satellite/ndvi-image?bbox=${b.str}&width=512&height=512`).then(r => r.json()),
@@ -98,6 +103,7 @@ export default function CopernicusBrowser() {
   const fullBrowse = async () => {
     setLoading(true)
     setError('')
+    updateBboxRef()
     try {
       const q = new URLSearchParams({
         lat, lng, delta,
